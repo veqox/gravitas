@@ -1,7 +1,6 @@
 [package]
-name = "gravitas-rs"
+name = "packet"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-packet = { path = "crates/packet" }

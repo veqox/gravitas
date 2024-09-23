@@ -3,12 +3,5 @@
 version = 3
 
 [[package]]
-name = "gravitas-rs"
-version = "0.1.0"
-dependencies = [
- "packet",
-]
-
-[[package]]
 name = "packet"
 version = "0.1.0"
