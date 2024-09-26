@@ -45,6 +45,14 @@ impl Header {
             arcount: u16::from_be_bytes(header[10..12].try_into()?),
         })
     }
+
+    pub fn try_serialize_section(
+        self,
+        packet: &mut [u8; crate::PACKET_SIZE],
+        pos: &mut usize,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -78,6 +86,14 @@ impl TryFrom<&[u8]> for Flags {
     }
 }
 
+impl<'a> TryInto<&'a [u8]> for Flags {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_into(self) -> Result<&'a [u8], Self::Error> {
+        todo!()
+    }
+}
+
 #[derive(Debug)]
 #[repr(u8)]
 pub enum Opcode {
@@ -85,6 +101,17 @@ pub enum Opcode {
     IQuery = 1,
     Status = 2,
     Undefined(u8),
+}
+
+impl Opcode {
+    pub fn to_u8(self) -> u8 {
+        match self {
+            Opcode::Query => 0,
+            Opcode::IQuery => 1,
+            Opcode::Status => 2,
+            Opcode::Undefined(x) => x,
+        }
+    }
 }
 
 impl From<u8> for Opcode {

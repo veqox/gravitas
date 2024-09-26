@@ -29,7 +29,7 @@ pub struct Packet {
 }
 
 impl TryFrom<[u8; PACKET_SIZE]> for Packet {
-    type Error = std::array::TryFromSliceError;
+    type Error = Box<dyn std::error::Error>;
 
     fn try_from(packet: [u8; PACKET_SIZE]) -> Result<Self, Self::Error> {
         let mut pos = 0;
@@ -43,5 +43,16 @@ impl TryFrom<[u8; PACKET_SIZE]> for Packet {
             authorities: vec![],
             additionals: vec![],
         })
+    }
+}
+
+impl<'a> TryInto<&'a [u8]> for Packet {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_into(self) -> Result<&'a [u8], Self::Error> {
+        let mut buf: [u8; PACKET_SIZE] = [0; PACKET_SIZE];
+        let mut pos = 0;
+
+        todo!()
     }
 }
