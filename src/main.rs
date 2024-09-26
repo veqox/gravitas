@@ -9,6 +9,6 @@ fn main() {
     while let Ok((amt, src)) = socket.recv_from(&mut buf) {
         println!("{} bytes from {}", amt, src.ip());
         let packet = Packet::try_from(buf).unwrap();
-        println!("Packet: {:?}", packet)
+        println!("Packet: {:?}", packet);
     }
 }

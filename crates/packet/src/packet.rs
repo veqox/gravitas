@@ -1,9 +1,3 @@
-use std::u8;
-
-use crate::header::{Header, HEADER_SIZE};
-use crate::question::Question;
-use crate::resource_record::ResourceRecord;
-
 /* https://www.rfc-editor.org/rfc/rfc1035#section-4.1
 
 +---------------------
@@ -19,6 +13,10 @@ use crate::resource_record::ResourceRecord;
 +---------------------+
 */
 
+use crate::header::Header;
+use crate::question::Question;
+use crate::resource_record::ResourceRecord;
+
 pub const PACKET_SIZE: usize = 512;
 
 #[derive(Debug)]
@@ -33,37 +31,10 @@ pub struct Packet {
 impl TryFrom<[u8; PACKET_SIZE]> for Packet {
     type Error = std::array::TryFromSliceError;
 
-    fn try_from(slice: [u8; PACKET_SIZE]) -> Result<Self, Self::Error> {
+    fn try_from(packet: [u8; PACKET_SIZE]) -> Result<Self, Self::Error> {
         let mut pos = 0;
-        let header: Header = slice[pos..pos + HEADER_SIZE].try_into()?;
-        pos += HEADER_SIZE;
-
-        let mut questions: Vec<Question> = vec![];
-        for _ in 0..header.qdcount {
-            let mut qname: Vec<Vec<u8>> = vec![];
-
-            while slice[pos] != 0 {
-                let length = slice[pos] as usize;
-                pos += 1;
-
-                let label = &slice[pos..pos + length];
-                pos += length;
-
-                qname.push(label.to_vec());
-            }
-
-            let qtype: [u8; 2] = slice[pos..pos + 2].try_into()?;
-            pos += 2;
-
-            let qclass: [u8; 2] = slice[pos..pos + 2].try_into()?;
-            pos += 2;
-
-            questions.push(Question {
-                qname,
-                qtype,
-                qclass,
-            });
-        }
+        let header: Header = Header::try_parse_section(packet, &mut pos)?;
+        let questions: Vec<Question> = Question::try_parse_section(packet, &mut pos, &header)?;
 
         Ok(Self {
             header,

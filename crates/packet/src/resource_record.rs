@@ -22,4 +22,11 @@
 */
 
 #[derive(Debug)]
-pub struct ResourceRecord;
+pub struct ResourceRecord {
+    pub name: Vec<u8>,
+    pub r_type: [u8; 2],
+    pub class: [u8; 2],
+    pub ttl: u32,
+    pub rd_length: u16,
+    pub r_data: Vec<u8>,
+}

@@ -28,19 +28,21 @@ pub struct Header {
     pub arcount: u16,
 }
 
-impl TryFrom<&[u8]> for Header {
-    type Error = std::array::TryFromSliceError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let value: [u8; HEADER_SIZE] = value.try_into()?;
+impl Header {
+    pub fn try_parse_section(
+        packet: [u8; crate::PACKET_SIZE],
+        pos: &mut usize,
+    ) -> Result<Self, std::array::TryFromSliceError> {
+        let header: [u8; HEADER_SIZE] = packet[*pos..*pos + HEADER_SIZE].try_into()?;
+        *pos = *pos + HEADER_SIZE;
 
         Ok(Self {
-            id: u16::from_be_bytes(value[0..2].try_into()?),
-            flags: value[2..4].try_into()?,
-            qdcount: u16::from_be_bytes(value[4..6].try_into()?),
-            ancount: u16::from_be_bytes(value[6..8].try_into()?),
-            nscount: u16::from_be_bytes(value[8..10].try_into()?),
-            arcount: u16::from_be_bytes(value[10..12].try_into()?),
+            id: u16::from_be_bytes(header[0..2].try_into()?),
+            flags: header[2..4].try_into()?,
+            qdcount: u16::from_be_bytes(header[4..6].try_into()?),
+            ancount: u16::from_be_bytes(header[6..8].try_into()?),
+            nscount: u16::from_be_bytes(header[8..10].try_into()?),
+            arcount: u16::from_be_bytes(header[10..12].try_into()?),
         })
     }
 }
@@ -61,7 +63,7 @@ impl TryFrom<&[u8]> for Flags {
     type Error = std::array::TryFromSliceError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let value: [u8; 2] = value.try_into()?;
+        let value: [u8; 2] = value[0..2].try_into()?;
 
         Ok(Self {
             qr: value[0] & 0b10000000 >> 7,
