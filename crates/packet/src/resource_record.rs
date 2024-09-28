@@ -21,11 +21,7 @@
 +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 */
 
-use crate::{
-    error::DNSError,
-    header::Header,
-    question::{QClass, QType},
-};
+use crate::{error::DNSError, header::Header, packet::Packet};
 
 #[derive(Debug)]
 pub struct ResourceRecord {
@@ -39,7 +35,7 @@ pub struct ResourceRecord {
 
 impl ResourceRecord {
     pub fn try_parse_section(
-        packet: [u8; crate::PACKET_SIZE],
+        packet: [u8; Packet::MAX_SIZE],
         pos: &mut usize,
         header: &Header,
     ) -> Result<Vec<Self>, Box<dyn std::error::Error>> {
@@ -76,8 +72,8 @@ impl ResourceRecord {
 
             resource_records.push(ResourceRecord {
                 name,
-                r_type: r#type.try_into()?,
-                r_class: class.try_into()?,
+                r_type: Type::try_from_u16(r#type)?,
+                r_class: Class::try_from_u16(class)?,
                 ttl,
                 rd_length,
                 r_data,
@@ -87,12 +83,30 @@ impl ResourceRecord {
         Ok(resource_records)
     }
 
-    pub fn try_serialize_section(
-        self,
-        packet: &mut [u8; crate::PACKET_SIZE],
-        pos: &mut usize,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        todo!()
+    pub fn try_serialize_section(&self, packet: &mut [u8; Packet::MAX_SIZE], pos: &mut usize) {
+        for label in self.name.iter() {
+            packet[*pos] = label.len() as u8;
+            *pos += 1;
+            packet[*pos..*pos + label.len()].copy_from_slice(label.as_slice());
+            *pos += label.len();
+        }
+        packet[*pos] = 0;
+        *pos += 1;
+
+        packet[*pos..*pos + 2].copy_from_slice(&self.r_type.to_u16().to_be_bytes());
+        *pos += 2;
+
+        packet[*pos..*pos + 2].copy_from_slice(&self.r_class.to_u16().to_be_bytes());
+        *pos += 2;
+
+        packet[*pos..*pos + 4].copy_from_slice(&self.ttl.to_be_bytes());
+        *pos += 4;
+
+        packet[*pos..*pos + 2].copy_from_slice(&self.rd_length.to_be_bytes());
+        *pos += 2;
+
+        packet[*pos..*pos + self.rd_length as usize].copy_from_slice(&self.r_data.as_slice());
+        *pos += self.rd_length as usize;
     }
 }
 
@@ -101,45 +115,41 @@ impl ResourceRecord {
 pub enum Type {
     A = 1,
     NS = 2,
-    // MD = 3, Obsolete
-    // MF = 4, Obsolete
     CNAME = 5,
     SOA = 6,
-    // MB = 7, Experimental
-    // MG = 8, Experimental
-    // MR = 9, Experimental
-    // NULL = 10, Experimental
-    WKS = 11,
     PTR = 12,
-    HINFO = 13,
     MX = 15,
     TXT = 16,
+    AAAA = 28,
+    OPT = 41,
 }
 
-impl TryFrom<u16> for Type {
-    type Error = DNSError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+impl Type {
+    pub fn try_from_u16(value: u16) -> Result<Self, DNSError> {
         match value {
             1 => Ok(Self::A),
             2 => Ok(Self::NS),
             5 => Ok(Self::CNAME),
             6 => Ok(Self::SOA),
-            11 => Ok(Self::WKS),
             12 => Ok(Self::PTR),
-            13 => Ok(Self::HINFO),
             15 => Ok(Self::MX),
             16 => Ok(Self::TXT),
+            41 => Ok(Self::OPT),
             x => Err(DNSError::InvalidType(x)),
         }
     }
-}
 
-impl From<QType> for Type {
-    fn from(value: QType) -> Self {
-        match value {
-            QType::Type(t) => t,
-            _ => panic!("Invalid type"),
+    pub fn to_u16(&self) -> u16 {
+        match self {
+            Self::A => 1,
+            Self::NS => 2,
+            Self::CNAME => 5,
+            Self::SOA => 6,
+            Self::PTR => 12,
+            Self::MX => 15,
+            Self::TXT => 16,
+            Self::AAAA => 28,
+            Self::OPT => 41,
         }
     }
 }
@@ -148,29 +158,21 @@ impl From<QType> for Type {
 #[repr(u16)]
 pub enum Class {
     IN = 1,
-    // CS = 2, Obsolete
-    CH = 3,
-    HS = 4,
+    Size(u16),
 }
 
-impl TryFrom<u16> for Class {
-    type Error = DNSError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
+impl Class {
+    pub fn try_from_u16(value: u16) -> Result<Self, DNSError> {
         match value {
-            1 => Ok(Class::IN),
-            3 => Ok(Class::CH),
-            4 => Ok(Class::HS),
-            _ => Err(DNSError::InvalidClass(value)),
+            1 => Ok(Self::IN),
+            x => Ok(Self::Size(x)),
         }
     }
-}
 
-impl From<QClass> for Class {
-    fn from(value: QClass) -> Self {
-        match value {
-            QClass::Class(t) => t,
-            _ => panic!("Invalid class"),
+    pub fn to_u16(&self) -> u16 {
+        match self {
+            Self::IN => 1,
+            Self::Size(x) => *x,
         }
     }
 }

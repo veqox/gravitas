@@ -17,8 +17,6 @@ use crate::header::Header;
 use crate::question::Question;
 use crate::resource_record::ResourceRecord;
 
-pub const PACKET_SIZE: usize = 512;
-
 #[derive(Debug)]
 pub struct Packet {
     pub header: Header,
@@ -28,31 +26,56 @@ pub struct Packet {
     pub additionals: Vec<ResourceRecord>,
 }
 
-impl TryFrom<[u8; PACKET_SIZE]> for Packet {
+impl Packet {
+    pub const MAX_SIZE: usize = 512;
+}
+
+impl TryFrom<[u8; Packet::MAX_SIZE]> for Packet {
     type Error = Box<dyn std::error::Error>;
 
-    fn try_from(packet: [u8; PACKET_SIZE]) -> Result<Self, Self::Error> {
+    fn try_from(packet: [u8; Self::MAX_SIZE]) -> Result<Self, Self::Error> {
         let mut pos = 0;
         let header: Header = Header::try_parse_section(packet, &mut pos)?;
-        let questions: Vec<Question> = Question::try_parse_section(packet, &mut pos, &header)?;
+        let questions = Question::try_parse_section(packet, &mut pos, &header)?;
+        let answers = ResourceRecord::try_parse_section(packet, &mut pos, &header)?;
+        let authorities = ResourceRecord::try_parse_section(packet, &mut pos, &header)?;
+        let additionals = ResourceRecord::try_parse_section(packet, &mut pos, &header)?;
 
         Ok(Self {
             header,
             questions,
-            answers: vec![],
-            authorities: vec![],
-            additionals: vec![],
+            answers,
+            authorities,
+            additionals,
         })
     }
 }
 
-impl<'a> TryInto<&'a [u8]> for Packet {
-    type Error = Box<dyn std::error::Error>;
-
-    fn try_into(self) -> Result<&'a [u8], Self::Error> {
-        let mut buf: [u8; PACKET_SIZE] = [0; PACKET_SIZE];
+impl Packet {
+    pub fn try_serialize_into<'a>(
+        &self,
+        buf: &'a mut [u8; Self::MAX_SIZE],
+    ) -> Result<&'a [u8], Box<dyn std::error::Error>> {
         let mut pos = 0;
 
-        todo!()
+        self.header.serialize_section(buf, &mut pos);
+
+        for question in &self.questions {
+            question.serialize_section(buf, &mut pos);
+        }
+
+        for answer in &self.answers {
+            answer.try_serialize_section(buf, &mut pos);
+        }
+
+        for authority in &self.authorities {
+            authority.try_serialize_section(buf, &mut pos);
+        }
+
+        for additonal in &self.additionals {
+            additonal.try_serialize_section(buf, &mut pos);
+        }
+
+        Ok(&buf[..pos]) // Return the portion of the buffer that was used
     }
 }

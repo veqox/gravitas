@@ -13,21 +13,21 @@
 */
 
 use crate::{
-    error::DNSError,
     header::Header,
+    packet::Packet,
     resource_record::{Class, Type},
 };
 
 #[derive(Debug, Clone)]
 pub struct Question {
     pub q_name: Vec<Vec<u8>>,
-    pub q_type: QType,
-    pub q_class: QClass,
+    pub q_type: Type,
+    pub q_class: Class,
 }
 
 impl Question {
     pub fn try_parse_section(
-        packet: [u8; crate::PACKET_SIZE],
+        packet: [u8; Packet::MAX_SIZE],
         pos: &mut usize,
         header: &Header,
     ) -> Result<Vec<Question>, Box<dyn std::error::Error>> {
@@ -55,76 +55,28 @@ impl Question {
 
             questions.push(Question {
                 q_name: qname,
-                q_type: qtype.try_into()?,
-                q_class: qclass.try_into()?,
+                q_type: Type::try_from_u16(qtype)?,
+                q_class: Class::try_from_u16(qclass)?,
             });
         }
 
         return Ok(questions);
     }
 
-    pub fn try_serialize_section(
-        self,
-        packet: &mut [u8; crate::PACKET_SIZE],
-        pos: &mut usize,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        todo!()
-    }
-}
-
-#[derive(Debug, Clone)]
-#[repr(u16)]
-pub enum QType {
-    Type(Type),
-    AXFR = 252,
-    MAILB = 253,
-    // MAILA = 254, Obsolete
-    ALL = 255,
-}
-
-impl TryFrom<u16> for QType {
-    type Error = DNSError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match Type::try_from(value) {
-            Ok(t) => Ok(Self::Type(t)),
-            Err(DNSError::InvalidType(252)) => Ok(Self::AXFR),
-            Err(DNSError::InvalidType(253)) => Ok(Self::MAILB),
-            Err(DNSError::InvalidType(255)) => Ok(Self::ALL),
-            Err(DNSError::InvalidType(x)) => Err(DNSError::InvalidQType(x)),
-            _ => unreachable!(),
+    pub fn serialize_section(&self, packet: &mut [u8; Packet::MAX_SIZE], pos: &mut usize) {
+        for label in self.q_name.iter() {
+            packet[*pos] = label.len() as u8;
+            *pos += 1;
+            packet[*pos..*pos + label.len()].copy_from_slice(label.as_slice());
+            *pos += label.len();
         }
-    }
-}
+        packet[*pos] = 0;
+        *pos += 1;
 
-impl From<Type> for QType {
-    fn from(value: Type) -> Self {
-        Self::Type(value)
-    }
-}
+        packet[*pos..*pos + 2].copy_from_slice(&self.q_type.to_u16().to_be_bytes());
+        *pos += 2;
 
-#[derive(Debug, Clone)]
-#[repr(u16)]
-pub enum QClass {
-    Class(Class),
-    ANY = 255,
-}
-
-impl TryFrom<u16> for QClass {
-    type Error = DNSError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match Class::try_from(value) {
-            Ok(t) => Ok(Self::Class(t)),
-            Err(DNSError::InvalidClass(252)) => Ok(Self::ANY),
-            Err(DNSError::InvalidClass(x)) => Err(DNSError::InvalidQClass(x)),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<Class> for QClass {
-    fn from(value: Class) -> Self {
-        Self::Class(value)
+        packet[*pos..*pos + 2].copy_from_slice(&self.q_class.to_u16().to_be_bytes());
+        *pos += 2;
     }
 }
