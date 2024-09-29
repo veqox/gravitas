@@ -24,25 +24,25 @@
 use crate::{error::DNSError, header::Header, packet::Packet};
 
 #[derive(Debug)]
-pub struct ResourceRecord {
-    pub name: Vec<Vec<u8>>,
+pub struct ResourceRecord<'a> {
+    pub r_name: Vec<&'a [u8]>,
     pub r_type: Type,
     pub r_class: Class,
     pub ttl: u32,
     pub rd_length: u16,
-    pub r_data: Vec<u8>,
+    pub r_data: &'a [u8],
 }
 
-impl ResourceRecord {
+impl<'a> ResourceRecord<'a> {
     pub fn try_parse_section(
-        packet: [u8; Packet::MAX_SIZE],
+        packet: &'a [u8; Packet::MAX_SIZE],
         pos: &mut usize,
         header: &Header,
     ) -> Result<Vec<Self>, Box<dyn std::error::Error>> {
         let mut resource_records: Vec<ResourceRecord> = vec![];
 
         for _ in 0..header.arcount {
-            let mut name: Vec<Vec<u8>> = vec![];
+            let mut name: Vec<&'a [u8]> = vec![];
 
             while packet[*pos] != 0 {
                 let length = packet[*pos] as usize;
@@ -51,7 +51,7 @@ impl ResourceRecord {
                 let label = &packet[*pos..*pos + length];
                 *pos += length;
 
-                name.push(label.to_vec());
+                name.push(label);
             }
             *pos += 1;
 
@@ -67,11 +67,11 @@ impl ResourceRecord {
             let rd_length = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
             *pos += 2;
 
-            let r_data = packet[*pos..*pos + rd_length as usize].to_vec();
+            let r_data = &packet[*pos..*pos + rd_length as usize];
             *pos += rd_length as usize;
 
             resource_records.push(ResourceRecord {
-                name,
+                r_name: name,
                 r_type: Type::try_from_u16(r#type)?,
                 r_class: Class::try_from_u16(class)?,
                 ttl,
@@ -84,10 +84,10 @@ impl ResourceRecord {
     }
 
     pub fn try_serialize_section(&self, packet: &mut [u8; Packet::MAX_SIZE], pos: &mut usize) {
-        for label in self.name.iter() {
+        for label in self.r_name.iter() {
             packet[*pos] = label.len() as u8;
             *pos += 1;
-            packet[*pos..*pos + label.len()].copy_from_slice(label.as_slice());
+            packet[*pos..*pos + label.len()].copy_from_slice(label);
             *pos += label.len();
         }
         packet[*pos] = 0;
@@ -105,7 +105,7 @@ impl ResourceRecord {
         packet[*pos..*pos + 2].copy_from_slice(&self.rd_length.to_be_bytes());
         *pos += 2;
 
-        packet[*pos..*pos + self.rd_length as usize].copy_from_slice(&self.r_data.as_slice());
+        packet[*pos..*pos + self.rd_length as usize].copy_from_slice(&self.r_data);
         *pos += self.rd_length as usize;
     }
 }
@@ -121,7 +121,6 @@ pub enum Type {
     MX = 15,
     TXT = 16,
     AAAA = 28,
-    OPT = 41,
 }
 
 impl Type {
@@ -134,7 +133,6 @@ impl Type {
             12 => Ok(Self::PTR),
             15 => Ok(Self::MX),
             16 => Ok(Self::TXT),
-            41 => Ok(Self::OPT),
             x => Err(DNSError::InvalidType(x)),
         }
     }
@@ -149,7 +147,6 @@ impl Type {
             Self::MX => 15,
             Self::TXT => 16,
             Self::AAAA => 28,
-            Self::OPT => 41,
         }
     }
 }

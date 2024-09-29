@@ -32,7 +32,7 @@ pub struct Header {
 
 impl Header {
     pub fn try_parse_section(
-        packet: [u8; Packet::MAX_SIZE],
+        packet: &[u8; Packet::MAX_SIZE],
         pos: &mut usize,
     ) -> Result<Self, std::array::TryFromSliceError> {
         let header: [u8; HEADER_SIZE] = packet[*pos..*pos + HEADER_SIZE].try_into()?;
@@ -73,26 +73,26 @@ impl Header {
 #[derive(Debug)]
 pub struct Flags {
     pub qr: u8,         // 1 bit
-    pub opcode: Opcode, // 4 bits
+    pub opcode: OpCode, // 4 bits
     pub aa: u8,         // 1 bit
     pub tc: u8,         // 1 bit,
     pub rd: u8,         // 1 bit
     pub ra: u8,         // 1 bit
     pub z: u8,          // 3 bits
-    pub rcode: RCodes,  // 4 bits
+    pub rcode: RCode,   // 4 bits
 }
 
 impl Flags {
     pub fn from_be_bytes(value: [u8; 2]) -> Self {
         Self {
             qr: value[0] & 0b10000000 >> 7,
-            opcode: Opcode::from_u8(value[0] & 0b01111000 >> 3),
+            opcode: OpCode::from_u8(value[0] & 0b01111000 >> 3),
             aa: value[0] & 0b00000100 >> 2,
             tc: value[0] & 0b00000010 >> 1,
             rd: value[0] & 0b00000001,
             ra: value[1] & 0b10000000 >> 7,
             z: value[1] & 0b01110000 >> 4,
-            rcode: RCodes::from_u8(value[1] & 0b00001111),
+            rcode: RCode::from_u8(value[1] & 0b00001111),
         }
     }
 
@@ -114,16 +114,16 @@ impl Flags {
 
 #[derive(Debug)]
 #[repr(u8)]
-pub enum Opcode {
+pub enum OpCode {
     Query = 0,
     IQuery = 1,
     Status = 2,
-    Notify = 4, // RFC-1996
-    Update = 5, // RFC-2136
+    Notify = 4,
+    Update = 5,
     Undefined(u8),
 }
 
-impl Opcode {
+impl OpCode {
     pub fn from_u8(value: u8) -> Self {
         match value {
             0 => Self::Query,
@@ -149,7 +149,7 @@ impl Opcode {
 
 #[derive(Debug)]
 #[repr(u8)]
-pub enum RCodes {
+pub enum RCode {
     NoError = 0,
     FormatError = 1,
     ServerFailure = 2,
@@ -159,16 +159,16 @@ pub enum RCodes {
     Undefined(u8),
 }
 
-impl RCodes {
+impl RCode {
     pub fn from_u8(value: u8) -> Self {
         match value {
-            0 => RCodes::NoError,
-            1 => RCodes::FormatError,
-            2 => RCodes::ServerFailure,
-            3 => RCodes::NameError,
-            4 => RCodes::NotImplemented,
-            5 => RCodes::Refused,
-            x => RCodes::Undefined(x),
+            0 => Self::NoError,
+            1 => Self::FormatError,
+            2 => Self::ServerFailure,
+            3 => Self::NameError,
+            4 => Self::NotImplemented,
+            5 => Self::Refused,
+            x => Self::Undefined(x),
         }
     }
 

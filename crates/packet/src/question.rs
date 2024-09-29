@@ -19,22 +19,22 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Question {
-    pub q_name: Vec<Vec<u8>>,
+pub struct Question<'a> {
+    pub q_name: Vec<&'a [u8]>,
     pub q_type: Type,
     pub q_class: Class,
 }
 
-impl Question {
+impl<'a> Question<'a> {
     pub fn try_parse_section(
-        packet: [u8; Packet::MAX_SIZE],
+        packet: &'a [u8; Packet::MAX_SIZE],
         pos: &mut usize,
         header: &Header,
-    ) -> Result<Vec<Question>, Box<dyn std::error::Error>> {
+    ) -> Result<Vec<Question<'a>>, Box<dyn std::error::Error>> {
         let mut questions: Vec<Question> = vec![];
 
         for _ in 0..header.qdcount {
-            let mut qname: Vec<Vec<u8>> = vec![];
+            let mut qname: Vec<&'a [u8]> = vec![];
 
             while packet[*pos] != 0 {
                 let length = packet[*pos] as usize;
@@ -43,7 +43,7 @@ impl Question {
                 let label = &packet[*pos..*pos + length];
                 *pos += length;
 
-                qname.push(label.to_vec());
+                qname.push(label);
             }
             *pos += 1;
 
@@ -67,7 +67,7 @@ impl Question {
         for label in self.q_name.iter() {
             packet[*pos] = label.len() as u8;
             *pos += 1;
-            packet[*pos..*pos + label.len()].copy_from_slice(label.as_slice());
+            packet[*pos..*pos + label.len()].copy_from_slice(label);
             *pos += label.len();
         }
         packet[*pos] = 0;
