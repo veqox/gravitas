@@ -35,9 +35,15 @@ impl<'a> Packet<'a> {
         let mut pos = 0;
         let header: Header = Header::try_parse_section(packet, &mut pos)?;
         let questions = Question::try_parse_section(packet, &mut pos, &header)?;
-        let answers = ResourceRecord::try_parse_section(packet, &mut pos, &header)?;
-        let authorities = ResourceRecord::try_parse_section(packet, &mut pos, &header)?;
-        let additionals = ResourceRecord::try_parse_section(packet, &mut pos, &header)?;
+        let answers = (0..header.ancount)
+            .map(|_| ResourceRecord::try_parse_section(packet, &mut pos))
+            .collect::<Result<Vec<_>, _>>()?;
+        let authorities = (0..header.nscount)
+            .map(|_| ResourceRecord::try_parse_section(packet, &mut pos))
+            .collect::<Result<Vec<_>, _>>()?;
+        let additionals = (0..header.arcount)
+            .map(|_| ResourceRecord::try_parse_section(packet, &mut pos))
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Self {
             header,

@@ -21,7 +21,7 @@
 +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 */
 
-use crate::{error::DNSError, header::Header, packet::Packet};
+use crate::{error::DNSError, packet::Packet};
 
 #[derive(Debug)]
 pub struct ResourceRecord<'a> {
@@ -37,50 +37,45 @@ impl<'a> ResourceRecord<'a> {
     pub fn try_parse_section(
         packet: &'a [u8; Packet::MAX_SIZE],
         pos: &mut usize,
-        header: &Header,
-    ) -> Result<Vec<Self>, Box<dyn std::error::Error>> {
-        let mut resource_records: Vec<ResourceRecord> = vec![];
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        println!("{:?}", &packet[*pos..packet.len()]);
 
-        for _ in 0..header.arcount {
-            let mut name: Vec<&'a [u8]> = vec![];
+        let mut name: Vec<&'a [u8]> = vec![];
 
-            while packet[*pos] != 0 {
-                let length = packet[*pos] as usize;
-                *pos += 1;
-
-                let label = &packet[*pos..*pos + length];
-                *pos += length;
-
-                name.push(label);
-            }
+        while packet[*pos] != 0 {
+            let length = packet[*pos] as usize;
             *pos += 1;
 
-            let r#type = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
-            *pos += 2;
+            let label = &packet[*pos..*pos + length];
+            *pos += length;
 
-            let class = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
-            *pos += 2;
-
-            let ttl = u32::from_be_bytes(packet[*pos..*pos + 4].try_into()?);
-            *pos += 4;
-
-            let rd_length = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
-            *pos += 2;
-
-            let r_data = &packet[*pos..*pos + rd_length as usize];
-            *pos += rd_length as usize;
-
-            resource_records.push(ResourceRecord {
-                r_name: name,
-                r_type: Type::try_from_u16(r#type)?,
-                r_class: Class::try_from_u16(class)?,
-                ttl,
-                rd_length,
-                r_data,
-            });
+            name.push(label);
         }
+        *pos += 1;
 
-        Ok(resource_records)
+        let r#type = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
+        *pos += 2;
+
+        let class = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
+        *pos += 2;
+
+        let ttl = u32::from_be_bytes(packet[*pos..*pos + 4].try_into()?);
+        *pos += 4;
+
+        let rd_length = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
+        *pos += 2;
+
+        let r_data = &packet[*pos..*pos + rd_length as usize];
+        *pos += rd_length as usize;
+
+        Ok(Self {
+            r_name: name,
+            r_type: Type::try_from_u16(r#type)?,
+            r_class: Class::try_from_u16(class)?,
+            ttl,
+            rd_length,
+            r_data,
+        })
     }
 
     pub fn try_serialize_section(&self, packet: &mut [u8; Packet::MAX_SIZE], pos: &mut usize) {
@@ -110,7 +105,7 @@ impl<'a> ResourceRecord<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Type {
     A = 1,
@@ -121,6 +116,11 @@ pub enum Type {
     MX = 15,
     TXT = 16,
     AAAA = 28,
+    SRV = 33,
+    NAPTR = 35,
+    OPT = 41,
+    CAA = 257,
+    Unknown(u16),
 }
 
 impl Type {
@@ -133,7 +133,12 @@ impl Type {
             12 => Ok(Self::PTR),
             15 => Ok(Self::MX),
             16 => Ok(Self::TXT),
-            x => Err(DNSError::InvalidType(x)),
+            28 => Ok(Self::AAAA),
+            33 => Ok(Self::SRV),
+            35 => Ok(Self::NAPTR),
+            41 => Ok(Self::OPT),
+            257 => Ok(Self::CAA),
+            x => Ok(Self::Unknown(x)),
         }
     }
 
@@ -147,11 +152,16 @@ impl Type {
             Self::MX => 15,
             Self::TXT => 16,
             Self::AAAA => 28,
+            Self::SRV => 33,
+            Self::NAPTR => 35,
+            Self::OPT => 41,
+            Self::CAA => 257,
+            Self::Unknown(x) => *x,
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Class {
     IN = 1,
