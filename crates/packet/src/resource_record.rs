@@ -21,11 +21,11 @@
 +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 */
 
-use crate::{error::DNSError, packet::Packet};
+use crate::{error::DNSError, packet::Packet, utils::DomainName};
 
 #[derive(Debug)]
 pub struct ResourceRecord<'a> {
-    pub r_name: Vec<&'a [u8]>,
+    pub r_name: DomainName<'a>,
     pub r_type: Type,
     pub r_class: Class,
     pub ttl: u32,
@@ -38,20 +38,7 @@ impl<'a> ResourceRecord<'a> {
         packet: &'a [u8; Packet::MAX_SIZE],
         pos: &mut usize,
     ) -> Result<Self, Box<dyn std::error::Error>> {
-        println!("{:?}", &packet[*pos..packet.len()]);
-
-        let mut name: Vec<&'a [u8]> = vec![];
-
-        while packet[*pos] != 0 {
-            let length = packet[*pos] as usize;
-            *pos += 1;
-
-            let label = &packet[*pos..*pos + length];
-            *pos += length;
-
-            name.push(label);
-        }
-        *pos += 1;
+        let name = DomainName::parse_section(packet, pos)?;
 
         let r#type = u16::from_be_bytes(packet[*pos..*pos + 2].try_into()?);
         *pos += 2;
@@ -79,14 +66,7 @@ impl<'a> ResourceRecord<'a> {
     }
 
     pub fn try_serialize_section(&self, packet: &mut [u8; Packet::MAX_SIZE], pos: &mut usize) {
-        for label in self.r_name.iter() {
-            packet[*pos] = label.len() as u8;
-            *pos += 1;
-            packet[*pos..*pos + label.len()].copy_from_slice(label);
-            *pos += label.len();
-        }
-        packet[*pos] = 0;
-        *pos += 1;
+        self.r_name.serialize_section(packet, pos);
 
         packet[*pos..*pos + 2].copy_from_slice(&self.r_type.to_u16().to_be_bytes());
         *pos += 2;

@@ -34,7 +34,9 @@ impl<'a> Packet<'a> {
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut pos = 0;
         let header: Header = Header::try_parse_section(packet, &mut pos)?;
-        let questions = Question::try_parse_section(packet, &mut pos, &header)?;
+        let questions = (0..header.qdcount)
+            .map(|_| Question::try_parse_section(packet, &mut pos))
+            .collect::<Result<Vec<_>, _>>()?;
         let answers = (0..header.ancount)
             .map(|_| ResourceRecord::try_parse_section(packet, &mut pos))
             .collect::<Result<Vec<_>, _>>()?;
