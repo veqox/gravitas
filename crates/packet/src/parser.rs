@@ -1,25 +1,19 @@
 use crate::{
-    header::{self, Flags, Header, OpCode, RCode},
+    header::{Flags, Header, OpCode, RCode},
     packet::Packet,
     question::Question,
     resource_record::{Class, ResourceRecord, Type},
 };
 
-pub struct Parser {
+pub struct Parser<'a> {
     pos: usize,
-    packet: [u8; Parser::PACKET_SIZE],
+    packet: &'a [u8],
 }
 
-impl Parser {
-    pub const PACKET_SIZE: usize = 512;
-    const HEADER_SIZE: usize = 12;
-    const FLAGS_SIZE: usize = 2;
-    const U32_SIZE: usize = std::mem::size_of::<u32>();
-    const U16_SIZE: usize = std::mem::size_of::<u16>();
-    const U8_SIZE: usize = std::mem::size_of::<u8>();
-
-    pub fn parse(packet: [u8; Parser::PACKET_SIZE]) -> Result<Packet, RCode> {
+impl<'a> Parser<'a> {
+    pub fn parse(packet: &'a [u8]) -> Result<Packet<'a>, RCode> {
         let mut parser = Self { pos: 0, packet };
+
         let header = parser.consume_header()?;
 
         let mut questions = vec![];
@@ -53,50 +47,54 @@ impl Parser {
 
     fn consume_u32(&mut self) -> Result<u32, RCode> {
         let value = u32::from_be_bytes(
-            self.packet[self.pos..self.pos + Self::U32_SIZE]
+            self.packet[self.pos..self.pos + std::mem::size_of::<u32>()]
                 .try_into()
                 .map_err(|_| RCode::FormatError)?,
         );
-        self.pos += Self::U32_SIZE;
-
+        self.pos += std::mem::size_of::<u32>();
         Ok(value)
     }
 
     fn consume_u16(&mut self) -> Result<u16, RCode> {
         let value = u16::from_be_bytes(
-            self.packet[self.pos..self.pos + Self::U16_SIZE]
+            self.packet[self.pos..self.pos + std::mem::size_of::<u16>()]
                 .try_into()
                 .map_err(|_| RCode::FormatError)?,
         );
-        self.pos += Self::U16_SIZE;
-
+        self.pos += std::mem::size_of::<u16>();
         Ok(value)
     }
 
     fn consume_u8(&mut self) -> Result<u8, RCode> {
-        if self.pos > self.packet.len() {
+        if self.pos >= self.packet.len() {
             return Err(RCode::FormatError);
         }
 
         let value = self.packet[self.pos];
-        self.pos += Self::U8_SIZE;
-
+        self.pos += std::mem::size_of::<u8>();
         Ok(value)
     }
 
-    fn consume_bytes(&mut self, len: usize) -> Result<Vec<u8>, RCode> {
+    fn read_u8(&self) -> Result<u8, RCode> {
+        if self.pos >= self.packet.len() {
+            return Err(RCode::FormatError);
+        }
+
+        Ok(self.packet[self.pos])
+    }
+
+    fn consume_bytes(&mut self, len: usize) -> Result<&'a [u8], RCode> {
         if self.pos + len > self.packet.len() {
             return Err(RCode::FormatError);
         }
 
-        let bytes = self.packet[self.pos..self.pos + len].to_vec();
+        let bytes = &self.packet[self.pos..self.pos + len];
         self.pos += len;
-
         Ok(bytes)
     }
 
-    fn consume_domain_name(&mut self) -> Result<Vec<Vec<u8>>, RCode> {
-        let mut labels: Vec<Vec<u8>> = vec![];
+    fn consume_domain_name(&mut self) -> Result<Vec<&'a [u8]>, RCode> {
+        let mut labels = vec![];
 
         loop {
             let len = self.consume_u8()? as usize;
@@ -111,11 +109,7 @@ impl Parser {
         Ok(labels)
     }
 
-    fn consume_header(&mut self) -> Result<Header, header::RCode> {
-        if self.pos + Parser::HEADER_SIZE > self.packet.len() {
-            return Err(RCode::FormatError);
-        }
-
+    fn consume_header(&mut self) -> Result<Header, RCode> {
         Ok(Header {
             id: self.consume_u16()?,
             flags: self.consume_flags()?,
@@ -127,25 +121,23 @@ impl Parser {
     }
 
     fn consume_flags(&mut self) -> Result<Flags, RCode> {
-        let flags: [u8; Parser::FLAGS_SIZE] = self.packet[self.pos..self.pos + Self::FLAGS_SIZE]
-            .try_into()
-            .map_err(|_| RCode::FormatError)?;
-
-        self.pos += Parser::FLAGS_SIZE;
+        if self.pos + 2 >= self.packet.len() {
+            return Err(RCode::FormatError);
+        }
 
         Ok(Flags {
-            qr: flags[0] & 0b10000000 >> 7,
-            opcode: OpCode::from_u8(flags[0] & 0b01111000 >> 3),
-            aa: flags[0] & 0b00000100 >> 2,
-            tc: flags[0] & 0b00000010 >> 1,
-            rd: flags[0] & 0b00000001,
-            ra: flags[1] & 0b10000000 >> 7,
-            z: flags[1] & 0b01110000 >> 4,
-            rcode: RCode::from_u8(flags[1] & 0b00001111),
+            qr: (self.read_u8()? & 0b10000000) >> 7,
+            opcode: OpCode::from_u8((self.read_u8()? & 0b01111000) >> 3),
+            aa: (self.read_u8()? & 0b00000100) >> 2,
+            tc: (self.read_u8()? & 0b00000010) >> 1,
+            rd: self.consume_u8()? & 0b00000001,
+            ra: (self.read_u8()? & 0b10000000) >> 7,
+            z: (self.read_u8()? & 0b01110000) >> 4,
+            rcode: RCode::from_u8(self.consume_u8()? & 0b00001111),
         })
     }
 
-    fn consume_question(&mut self) -> Result<Question, RCode> {
+    fn consume_question(&mut self) -> Result<Question<'a>, RCode> {
         let q_name = self.consume_domain_name()?;
         let q_type = Type::from_u16(self.consume_u16()?);
         let q_class = Class::from_u16(self.consume_u16()?);
@@ -157,12 +149,13 @@ impl Parser {
         })
     }
 
-    fn consume_resource_record(&mut self) -> Result<ResourceRecord, RCode> {
+    fn consume_resource_record(&mut self) -> Result<ResourceRecord<'a>, RCode> {
         let r_name = self.consume_domain_name()?;
         let r_type = Type::from_u16(self.consume_u16()?);
         let r_class = Class::from_u16(self.consume_u16()?);
         let ttl = self.consume_u32()?;
         let rd_length = self.consume_u16()?;
+
         let r_data = self.consume_bytes(rd_length as usize)?;
 
         Ok(ResourceRecord {

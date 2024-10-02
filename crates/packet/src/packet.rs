@@ -18,10 +18,10 @@ use crate::question::Question;
 use crate::resource_record::ResourceRecord;
 
 #[derive(Debug)]
-pub struct Packet {
+pub struct Packet<'a> {
     pub header: Header,
-    pub questions: Vec<Question>,
-    pub answers: Vec<ResourceRecord>,
-    pub authorities: Vec<ResourceRecord>,
-    pub additionals: Vec<ResourceRecord>,
+    pub questions: Vec<Question<'a>>,
+    pub answers: Vec<ResourceRecord<'a>>,
+    pub authorities: Vec<ResourceRecord<'a>>,
+    pub additionals: Vec<ResourceRecord<'a>>,
 }

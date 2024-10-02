@@ -22,13 +22,13 @@
 */
 
 #[derive(Debug)]
-pub struct ResourceRecord {
-    pub r_name: Vec<Vec<u8>>,
+pub struct ResourceRecord<'a> {
+    pub r_name: Vec<&'a [u8]>,
     pub r_type: Type,
     pub r_class: Class,
     pub ttl: u32,
     pub rd_length: u16,
-    pub r_data: Vec<u8>,
+    pub r_data: &'a [u8],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

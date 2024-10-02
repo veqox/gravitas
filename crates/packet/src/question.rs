@@ -15,8 +15,8 @@
 use crate::resource_record::{Class, Type};
 
 #[derive(Debug, Clone)]
-pub struct Question {
-    pub q_name: Vec<Vec<u8>>,
+pub struct Question<'a> {
+    pub q_name: Vec<&'a [u8]>,
     pub q_type: Type,
     pub q_class: Class,
 }
