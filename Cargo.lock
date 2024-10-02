@@ -3,12 +3,12 @@
 version = 3
 
 [[package]]
+name = "dns"
+version = "0.1.0"
+
+[[package]]
 name = "gravitas"
 version = "0.1.0"
 dependencies = [
- "packet",
+ "dns",
 ]
-
-[[package]]
-name = "packet"
-version = "0.1.0"

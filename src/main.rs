@@ -1,6 +1,6 @@
 use std::net;
 
-use packet::{resource_record::ResourceRecord, Parser, Serializer};
+use dns::{resource_record::ResourceRecord, Parser, Serializer};
 
 fn main() {
     let socket = net::UdpSocket::bind(format!("0.0.0.0:{}", 3000)).unwrap();
