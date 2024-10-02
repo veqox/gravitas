@@ -47,21 +47,21 @@ impl<'a> Parser<'a> {
 
     fn consume_u32(&mut self) -> Result<u32, RCode> {
         let value = u32::from_be_bytes(
-            self.packet[self.pos..self.pos + std::mem::size_of::<u32>()]
+            self.packet[self.pos..self.pos + size_of::<u32>()]
                 .try_into()
                 .map_err(|_| RCode::FormatError)?,
         );
-        self.pos += std::mem::size_of::<u32>();
+        self.pos += size_of::<u32>();
         Ok(value)
     }
 
     fn consume_u16(&mut self) -> Result<u16, RCode> {
         let value = u16::from_be_bytes(
-            self.packet[self.pos..self.pos + std::mem::size_of::<u16>()]
+            self.packet[self.pos..self.pos + size_of::<u16>()]
                 .try_into()
                 .map_err(|_| RCode::FormatError)?,
         );
-        self.pos += std::mem::size_of::<u16>();
+        self.pos += size_of::<u16>();
         Ok(value)
     }
 
@@ -71,7 +71,7 @@ impl<'a> Parser<'a> {
         }
 
         let value = self.packet[self.pos];
-        self.pos += std::mem::size_of::<u8>();
+        self.pos += size_of::<u8>();
         Ok(value)
     }
 
@@ -155,7 +155,6 @@ impl<'a> Parser<'a> {
         let r_class = Class::from_u16(self.consume_u16()?);
         let ttl = self.consume_u32()?;
         let rd_length = self.consume_u16()?;
-
         let r_data = self.consume_bytes(rd_length as usize)?;
 
         Ok(ResourceRecord {
