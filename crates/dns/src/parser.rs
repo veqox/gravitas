@@ -2,7 +2,11 @@ use crate::{
     header::{Flags, Header, OpCode, RCode},
     packet::Packet,
     question::Question,
-    resource_record::{Class, ResourceRecord, Type},
+    resource_record::{
+        AAAARecord, ARecord, CNAMERecord, Class, ClassOrSize, MXRecord, NSRecord, OPTRecord,
+        OptFlags, Option, PTRRecord, Record, ResourceRecord, SOARecord, TXTRecord, TtlOrOptFlags,
+        Type,
+    },
 };
 
 pub struct Parser<'a> {
@@ -140,7 +144,7 @@ impl<'a> Parser<'a> {
     fn consume_question(&mut self) -> Result<Question<'a>, RCode> {
         let q_name = self.consume_domain_name()?;
         let q_type = Type::from_u16(self.consume_u16()?);
-        let q_class = Class::from_u16(self.consume_u16()?);
+        let q_class = Class::try_from_u16(self.consume_u16()?)?;
 
         Ok(Question {
             q_name,
@@ -152,18 +156,99 @@ impl<'a> Parser<'a> {
     fn consume_resource_record(&mut self) -> Result<ResourceRecord<'a>, RCode> {
         let r_name = self.consume_domain_name()?;
         let r_type = Type::from_u16(self.consume_u16()?);
-        let r_class = Class::from_u16(self.consume_u16()?);
-        let ttl = self.consume_u32()?;
+        let class_or_size = ClassOrSize::from_u16(self.consume_u16()?);
+
+        let ttl_or_flags = match r_type {
+            Type::OPT => TtlOrOptFlags::OptFlags(OptFlags {
+                ext_rcode: self.consume_u8()?,
+                version: self.consume_u8()?,
+                do_flag: (self.read_u8()? & 0b10000000) >> 7,
+                z: (self.consume_u16()? & 0b01111111_11111111 as u16),
+            }),
+            _ => TtlOrOptFlags::Ttl(self.consume_u32()?),
+        };
+
         let rd_length = self.consume_u16()?;
-        let r_data = self.consume_bytes(rd_length as usize)?;
+
+        let r_data = match r_type {
+            Type::A => Ok(Record::A(ARecord {
+                address: (self.consume_bytes(4)?)
+                    .try_into()
+                    .map_err(|_| RCode::FormatError)?,
+            })),
+            Type::NS => Ok(Record::NS(NSRecord {
+                nsdname: self.consume_domain_name()?,
+            })),
+            Type::CNAME => Ok(Record::CNAME(CNAMERecord {
+                cname: self.consume_domain_name()?,
+            })),
+            Type::SOA => Ok(Record::SOA(SOARecord {
+                mname: self.consume_domain_name()?,
+                rname: self.consume_domain_name()?,
+                serial: self.consume_u32()?,
+                refresh: self.consume_u32()?,
+                retry: self.consume_u32()?,
+                expire: self.consume_u32()?,
+                minimum: self.consume_u32()?,
+            })),
+            Type::PTR => Ok(Record::PTR(PTRRecord {
+                ptrdname: self.consume_domain_name()?,
+            })),
+            Type::MX => Ok(Record::MX(MXRecord {
+                preference: self.consume_u16()?,
+                exchange: self.consume_domain_name()?,
+            })),
+            Type::TXT => Ok(Record::TXT(TXTRecord {
+                text: self.consume_bytes(rd_length as usize)?,
+            })),
+            Type::AAAA => Ok(Record::AAAA(AAAARecord {
+                address: (self.consume_bytes(16)?)
+                    .try_into()
+                    .map_err(|_| RCode::FormatError)?,
+            })),
+            Type::OPT => Ok(Record::OPT(OPTRecord {
+                options: self.consume_options(rd_length as usize)?,
+            })),
+            _ => Err(RCode::NotImplemented),
+        }?;
 
         Ok(ResourceRecord {
             r_name,
             r_type,
-            r_class,
-            ttl,
+            class_or_size,
+            ttl_or_flags,
             rd_length,
             r_data,
         })
+    }
+
+    fn consume_options(&mut self, len: usize) -> Result<Vec<Option<'a>>, RCode> {
+        let bytes = self.consume_bytes(len)?;
+        let mut options = vec![];
+
+        let mut pos = 0;
+
+        while pos < len {
+            let code = u16::from_be_bytes(
+                bytes[pos..pos + size_of::<u16>()]
+                    .try_into()
+                    .map_err(|_| RCode::FormatError)?,
+            );
+            pos += size_of::<u16>();
+
+            let length = u16::from_be_bytes(
+                bytes[pos..pos + size_of::<u16>()]
+                    .try_into()
+                    .map_err(|_| RCode::FormatError)?,
+            );
+            pos += size_of::<u16>();
+
+            let data = &bytes[pos..pos + length as usize];
+            pos += length as usize;
+
+            options.push(Option { code, length, data });
+        }
+
+        Ok(options)
     }
 }

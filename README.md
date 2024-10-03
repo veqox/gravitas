@@ -10,7 +10,7 @@ A dns server intended for self-hosting
 - [ ] Implement the basic dns protocol according to [rfc 1035](https://www.rfc-editor.org/rfc/rfc1035)
   - [x] Parse dns messages
   - [x] Serialize dns messages
-  - [ ] Support most common record types (A, AAAA, CNAME, MX, NS, PTR, SOA, TXT, SRV, etc.)
+  - [x] Support most common record types (A, AAAA, CNAME, MX, NS, PTR, SOA, TXT, SRV, etc.)
   - [ ] Support tcp alongside udp
   - [ ] Support recursive query resolution
   - [ ] Support iterative query resolution

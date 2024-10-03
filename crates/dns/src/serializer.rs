@@ -2,7 +2,7 @@ use crate::{
     header::{Flags, Header},
     packet::Packet,
     question::Question,
-    resource_record::ResourceRecord,
+    resource_record::{Record, ResourceRecord, TtlOrOptFlags},
 };
 
 pub struct Serializer<'a> {
@@ -86,9 +86,46 @@ impl<'a> Serializer<'a> {
     fn write_resource_record(&mut self, resource_record: &ResourceRecord<'a>) {
         self.write_domain_name(&resource_record.r_name);
         self.write_u16(resource_record.r_type.to_u16());
-        self.write_u16(resource_record.r_class.to_u16());
-        self.write_u32(resource_record.ttl);
-        self.write_u16(resource_record.r_data.len() as u16);
-        self.write_bytes(resource_record.r_data);
+        self.write_u16(resource_record.class_or_size.to_u16());
+
+        match &resource_record.ttl_or_flags {
+            TtlOrOptFlags::OptFlags(x) => {
+                self.write_u8(x.ext_rcode);
+                self.write_u8(x.version);
+                self.write_u16((x.do_flag as u16) << 15 | x.z);
+            }
+            TtlOrOptFlags::Ttl(x) => self.write_u32(*x),
+        }
+
+        self.write_u16(resource_record.rd_length);
+
+        match &resource_record.r_data {
+            Record::A(x) => self.write_bytes(x.address),
+            Record::NS(x) => self.write_domain_name(&x.nsdname),
+            Record::CNAME(x) => self.write_domain_name(&x.cname),
+            Record::SOA(x) => {
+                self.write_domain_name(&x.mname);
+                self.write_domain_name(&x.rname);
+                self.write_u32(x.serial);
+                self.write_u32(x.refresh);
+                self.write_u32(x.retry);
+                self.write_u32(x.expire);
+                self.write_u32(x.minimum);
+            }
+            Record::PTR(x) => self.write_domain_name(&x.ptrdname),
+            Record::MX(x) => {
+                self.write_u16(x.preference);
+                self.write_domain_name(&x.exchange);
+            }
+            Record::TXT(x) => self.write_bytes(x.text),
+            Record::AAAA(x) => self.write_bytes(x.address),
+            Record::OPT(x) => {
+                for option in &x.options {
+                    self.write_u16(option.code);
+                    self.write_u16(option.length);
+                    self.write_bytes(option.data);
+                }
+            }
+        };
     }
 }
