@@ -6,12 +6,12 @@ use crate::{
 };
 
 pub struct Serializer<'a> {
-    buf: &'a mut [u8],
+    buf: &'a mut [u8; 512],
     pos: usize,
 }
 
 impl<'a> Serializer<'a> {
-    pub fn serialize(packet: &'a Packet, buf: &'a mut [u8; 512]) {
+    pub fn serialize(packet: &'a Packet, buf: &'a mut [u8; 512]) -> usize {
         let mut serializer = Self { buf, pos: 0 };
 
         serializer.write_header(&packet.header);
@@ -31,6 +31,8 @@ impl<'a> Serializer<'a> {
         for additional in &packet.additionals {
             serializer.write_resource_record(additional);
         }
+
+        serializer.pos
     }
 
     fn write_u32(&mut self, value: u32) {

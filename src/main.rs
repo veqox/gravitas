@@ -21,8 +21,9 @@ fn main() {
         });
 
         let mut buf = [0; 512];
-        Serializer::serialize(&packet, &mut buf);
+        let len = Serializer::serialize(&packet, &mut buf);
+        let buf = &buf[0..len];
 
-        _ = socket.send_to(&buf, addr);
+        _ = socket.send_to(buf, addr);
     }
 }
