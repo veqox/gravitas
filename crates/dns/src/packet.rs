@@ -1,3 +1,7 @@
+use crate::header::Header;
+use crate::question::Question;
+use crate::resource_record::ResourceRecord;
+
 /* https://www.rfc-editor.org/rfc/rfc1035#section-4.1
 
 +---------------------
@@ -12,11 +16,6 @@
 |      Additional     | RRs holding additional information
 +---------------------+
 */
-
-use crate::header::Header;
-use crate::question::Question;
-use crate::resource_record::ResourceRecord;
-
 #[derive(Debug)]
 pub struct Packet<'a> {
     pub header: Header,

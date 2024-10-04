@@ -1,3 +1,5 @@
+use crate::header::RCode;
+
 /* https://www.rfc-editor.org/rfc/rfc1035#section-4.1.3
 
   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
@@ -20,9 +22,6 @@
 /                                               /
 +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 */
-
-use crate::header::RCode;
-
 #[derive(Debug)]
 pub struct ResourceRecord<'a> {
     pub r_name: Vec<&'a [u8]>,
