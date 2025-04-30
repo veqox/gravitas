@@ -1,4 +1,4 @@
-use crate::resource_record::{Class, Type};
+use crate::{class::Class, r#type::Type};
 
 /* https://www.rfc-editor.org/rfc/rfc1035#section-4.1.2
 
@@ -15,7 +15,7 @@ use crate::resource_record::{Class, Type};
 */
 #[derive(Debug, Clone)]
 pub struct Question<'a> {
-    pub q_name: Vec<&'a [u8]>,
-    pub q_type: Type,
-    pub q_class: Class,
+    pub name: Vec<&'a [u8]>,
+    pub r#type: Type,
+    pub class: Class,
 }

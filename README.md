@@ -11,6 +11,7 @@ A dns server intended for self-hosting
   - [x] Parse dns messages
   - [x] Serialize dns messages
   - [x] Support most common record types (A, AAAA, CNAME, MX, NS, PTR, SOA, TXT, SRV, etc.)
+  - [ ] Support domain name compression
   - [ ] Support tcp alongside udp
   - [ ] Support recursive query resolution
   - [ ] Support iterative query resolution

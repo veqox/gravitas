@@ -1,3 +1,5 @@
+use log::warn;
+
 /* https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1
 
   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
@@ -52,29 +54,34 @@ pub enum OpCode {
     Status = 2,
     Notify = 4,
     Update = 5,
-    Undefined(u8),
+    Unkown(u8),
 }
 
-impl OpCode {
-    pub fn from_u8(value: u8) -> Self {
+impl From<u8> for OpCode {
+    fn from(value: u8) -> Self {
         match value {
             0 => Self::Query,
             1 => Self::IQuery,
             2 => Self::Status,
             4 => Self::Notify,
             5 => Self::Update,
-            x => Self::Undefined(x),
+            x => {
+                warn!("unkown value for opcode {}", x);
+                Self::Unkown(x)
+            }
         }
     }
+}
 
-    pub fn to_u8(&self) -> u8 {
-        match *self {
+impl Into<u8> for OpCode {
+    fn into(self) -> u8 {
+        match self {
             Self::Query => 0,
             Self::IQuery => 1,
             Self::Status => 2,
             Self::Notify => 4,
             Self::Update => 5,
-            Self::Undefined(x) => x,
+            Self::Unkown(x) => x,
         }
     }
 }
@@ -88,11 +95,11 @@ pub enum RCode {
     NameError = 3,
     NotImplemented = 4,
     Refused = 5,
-    Undefined(u8),
+    Unkown(u8),
 }
 
-impl RCode {
-    pub fn from_u8(value: u8) -> Self {
+impl From<u8> for RCode {
+    fn from(value: u8) -> Self {
         match value {
             0 => Self::NoError,
             1 => Self::FormatError,
@@ -100,19 +107,24 @@ impl RCode {
             3 => Self::NameError,
             4 => Self::NotImplemented,
             5 => Self::Refused,
-            x => Self::Undefined(x),
+            x => {
+                warn!("unkown value for rcode {}", x);
+                Self::Unkown(x)
+            }
         }
     }
+}
 
-    pub fn to_u8(&self) -> u8 {
-        match *self {
+impl Into<u8> for RCode {
+    fn into(self) -> u8 {
+        match self {
             Self::NoError => 0,
             Self::FormatError => 1,
             Self::ServerFailure => 2,
             Self::NameError => 3,
             Self::NotImplemented => 4,
             Self::Refused => 5,
-            Self::Undefined(x) => x,
+            Self::Unkown(x) => x,
         }
     }
 }

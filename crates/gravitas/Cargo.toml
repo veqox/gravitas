@@ -1,7 +1,10 @@
 [package]
-name = "dns"
+name = "gravitas"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+dns = { workspace = true }
 log = { workspace = true }
+
+env_logger = "0.11.8"

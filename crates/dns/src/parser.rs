@@ -1,43 +1,54 @@
+use log::warn;
+
 use crate::{
-    header::{Flags, Header, OpCode, RCode},
+    header::{Flags, Header},
     packet::Packet,
     question::Question,
-    resource_record::{
-        AAAARecord, ARecord, CNAMERecord, Class, ClassOrSize, MXRecord, NSRecord, OPTRecord,
-        OptFlags, Option, PTRRecord, Record, ResourceRecord, SOARecord, TXTRecord, TtlOrOptFlags,
-        Type,
-    },
+    r#type::Type,
+    resource_record::{self, Record},
 };
 
+#[derive(Debug)]
+pub enum ParseError {
+    BufferOverflow,
+    InvalidLabelLength(usize),
+    NotImplemented,
+}
+
+#[derive(Debug)]
 pub struct Parser<'a> {
+    buf: &'a [u8],
     pos: usize,
-    packet: &'a [u8],
 }
 
 impl<'a> Parser<'a> {
-    pub fn parse(packet: &'a [u8]) -> Result<Packet<'a>, RCode> {
-        let mut parser = Self { pos: 0, packet };
+    pub fn parse(buf: &'a [u8]) -> Result<Packet<'a>, ParseError> {
+        let mut parser = Self { pos: 0, buf };
 
         let header = parser.consume_header()?;
 
-        let mut questions = vec![];
+        let mut questions = Vec::with_capacity(header.qdcount.into());
         for _ in 0..header.qdcount {
             questions.push(parser.consume_question()?);
         }
 
-        let mut answers = vec![];
+        let mut answers = Vec::with_capacity(header.ancount.into());
         for _ in 0..header.ancount {
             answers.push(parser.consume_resource_record()?);
         }
 
-        let mut authorities = vec![];
+        let mut authorities = Vec::with_capacity(header.nscount.into());
         for _ in 0..header.nscount {
             authorities.push(parser.consume_resource_record()?);
         }
 
-        let mut additionals = vec![];
+        let mut additionals = Vec::with_capacity(header.arcount.into());
         for _ in 0..header.arcount {
             additionals.push(parser.consume_resource_record()?);
+        }
+
+        if parser.pos != buf.len() {
+            warn!("{} bytes left in buffer", buf.len() - parser.pos);
         }
 
         Ok(Packet {
@@ -49,71 +60,62 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn consume_u32(&mut self) -> Result<u32, RCode> {
-        let value = u32::from_be_bytes(
-            self.packet[self.pos..self.pos + size_of::<u32>()]
-                .try_into()
-                .map_err(|_| RCode::FormatError)?,
-        );
-        self.pos += size_of::<u32>();
+    fn consume_u32(&mut self) -> Result<u32, ParseError> {
+        let value = u32::from_be_bytes([
+            self.consume_u8()?,
+            self.consume_u8()?,
+            self.consume_u8()?,
+            self.consume_u8()?,
+        ]);
         Ok(value)
     }
 
-    fn consume_u16(&mut self) -> Result<u16, RCode> {
-        let value = u16::from_be_bytes(
-            self.packet[self.pos..self.pos + size_of::<u16>()]
-                .try_into()
-                .map_err(|_| RCode::FormatError)?,
-        );
-        self.pos += size_of::<u16>();
+    fn consume_u16(&mut self) -> Result<u16, ParseError> {
+        let value = u16::from_be_bytes([self.consume_u8()?, self.consume_u8()?]);
         Ok(value)
     }
 
-    fn consume_u8(&mut self) -> Result<u8, RCode> {
-        if self.pos >= self.packet.len() {
-            return Err(RCode::FormatError);
-        }
-
-        let value = self.packet[self.pos];
+    fn consume_u8(&mut self) -> Result<u8, ParseError> {
+        let value = self.read_u8()?;
         self.pos += size_of::<u8>();
         Ok(value)
     }
 
-    fn read_u8(&self) -> Result<u8, RCode> {
-        if self.pos >= self.packet.len() {
-            return Err(RCode::FormatError);
+    fn read_u8(&self) -> Result<u8, ParseError> {
+        if self.pos >= self.buf.len() {
+            return Err(ParseError::BufferOverflow);
         }
 
-        Ok(self.packet[self.pos])
+        Ok(self.buf[self.pos])
     }
 
-    fn consume_bytes(&mut self, len: usize) -> Result<&'a [u8], RCode> {
-        if self.pos + len > self.packet.len() {
-            return Err(RCode::FormatError);
+    fn consume_bytes(&mut self, len: usize) -> Result<&'a [u8], ParseError> {
+        if self.pos + len > self.buf.len() {
+            return Err(ParseError::BufferOverflow);
         }
 
-        let bytes = &self.packet[self.pos..self.pos + len];
+        let bytes = &self.buf[self.pos..self.pos + len];
         self.pos += len;
         Ok(bytes)
     }
 
-    fn consume_domain_name(&mut self) -> Result<Vec<&'a [u8]>, RCode> {
+    fn consume_domain_name(&mut self) -> Result<Vec<&'a [u8]>, ParseError> {
         let mut labels = vec![];
 
         loop {
             let len = self.consume_u8()? as usize;
-            if len == 0 {
-                break;
-            }
 
-            let label = self.consume_bytes(len)?;
-            labels.push(label);
+            match len {
+                0 => break,
+                1..=63 => labels.push(self.consume_bytes(len)?),
+                _ => return Err(ParseError::InvalidLabelLength(len)),
+            }
         }
 
         Ok(labels)
     }
 
-    fn consume_header(&mut self) -> Result<Header, RCode> {
+    fn consume_header(&mut self) -> Result<Header, ParseError> {
         Ok(Header {
             id: self.consume_u16()?,
             flags: self.consume_flags()?,
@@ -124,65 +126,55 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn consume_flags(&mut self) -> Result<Flags, RCode> {
-        if self.pos + 2 >= self.packet.len() {
-            return Err(RCode::FormatError);
+    fn consume_flags(&mut self) -> Result<Flags, ParseError> {
+        if self.pos + 2 >= self.buf.len() {
+            return Err(ParseError::BufferOverflow);
         }
 
         Ok(Flags {
             qr: (self.read_u8()? & 0b10000000) >> 7,
-            opcode: OpCode::from_u8((self.read_u8()? & 0b01111000) >> 3),
+            opcode: ((self.read_u8()? & 0b01111000) >> 3).into(),
             aa: (self.read_u8()? & 0b00000100) >> 2,
             tc: (self.read_u8()? & 0b00000010) >> 1,
             rd: self.consume_u8()? & 0b00000001,
             ra: (self.read_u8()? & 0b10000000) >> 7,
             z: (self.read_u8()? & 0b01110000) >> 4,
-            rcode: RCode::from_u8(self.consume_u8()? & 0b00001111),
+            rcode: (self.consume_u8()? & 0b00001111).into(),
         })
     }
 
-    fn consume_question(&mut self) -> Result<Question<'a>, RCode> {
+    fn consume_question(&mut self) -> Result<Question<'a>, ParseError> {
         let q_name = self.consume_domain_name()?;
-        let q_type = Type::from_u16(self.consume_u16()?);
-        let q_class = Class::try_from_u16(self.consume_u16()?)?;
+        let q_type = self.consume_u16()?.into();
+        let q_class = self.consume_u16()?.into();
 
         Ok(Question {
-            q_name,
-            q_type,
-            q_class,
+            name: q_name,
+            r#type: q_type,
+            class: q_class,
         })
     }
 
-    fn consume_resource_record(&mut self) -> Result<ResourceRecord<'a>, RCode> {
+    fn consume_resource_record(
+        &mut self,
+    ) -> Result<resource_record::ResourceRecord<'a>, ParseError> {
         let r_name = self.consume_domain_name()?;
-        let r_type = Type::from_u16(self.consume_u16()?);
-        let class_or_size = ClassOrSize::from_u16(self.consume_u16()?);
-
-        let ttl_or_flags = match r_type {
-            Type::OPT => TtlOrOptFlags::OptFlags(OptFlags {
-                ext_rcode: self.consume_u8()?,
-                version: self.consume_u8()?,
-                do_flag: (self.read_u8()? & 0b10000000) >> 7,
-                z: (self.consume_u16()? & 0b01111111_11111111 as u16),
-            }),
-            _ => TtlOrOptFlags::Ttl(self.consume_u32()?),
-        };
-
+        let r_type = self.consume_u16()?.into();
+        let class = self.consume_u16()?.into();
+        let ttl = self.consume_u32()?.into();
         let rd_length = self.consume_u16()?;
 
-        let r_data = match r_type {
-            Type::A => Ok(Record::A(ARecord {
-                address: (self.consume_bytes(4)?)
-                    .try_into()
-                    .map_err(|_| RCode::FormatError)?,
-            })),
-            Type::NS => Ok(Record::NS(NSRecord {
+        let r_data = match &r_type {
+            Type::A => Record::A {
+                address: (self.consume_bytes(4)?).try_into().unwrap(),
+            },
+            Type::NS => Record::NS {
                 nsdname: self.consume_domain_name()?,
-            })),
-            Type::CNAME => Ok(Record::CNAME(CNAMERecord {
+            },
+            Type::CNAME => Record::CNAME {
                 cname: self.consume_domain_name()?,
-            })),
-            Type::SOA => Ok(Record::SOA(SOARecord {
+            },
+            Type::SOA => Record::SOA {
                 mname: self.consume_domain_name()?,
                 rname: self.consume_domain_name()?,
                 serial: self.consume_u32()?,
@@ -190,65 +182,38 @@ impl<'a> Parser<'a> {
                 retry: self.consume_u32()?,
                 expire: self.consume_u32()?,
                 minimum: self.consume_u32()?,
-            })),
-            Type::PTR => Ok(Record::PTR(PTRRecord {
+            },
+            Type::PTR => Record::PTR {
                 ptrdname: self.consume_domain_name()?,
-            })),
-            Type::MX => Ok(Record::MX(MXRecord {
+            },
+            Type::MX => Record::MX {
                 preference: self.consume_u16()?,
                 exchange: self.consume_domain_name()?,
-            })),
-            Type::TXT => Ok(Record::TXT(TXTRecord {
+            },
+            Type::TXT => Record::TXT {
                 text: self.consume_bytes(rd_length as usize)?,
-            })),
-            Type::AAAA => Ok(Record::AAAA(AAAARecord {
-                address: (self.consume_bytes(16)?)
-                    .try_into()
-                    .map_err(|_| RCode::FormatError)?,
-            })),
-            Type::OPT => Ok(Record::OPT(OPTRecord {
-                options: self.consume_options(rd_length as usize)?,
-            })),
-            _ => Err(RCode::NotImplemented),
-        }?;
+            },
+            Type::AAAA => Record::AAAA {
+                address: self.consume_bytes(16)?.try_into().unwrap(),
+            },
+            Type::Unknown(_) => Record::Unkown {
+                data: self.consume_bytes(rd_length as usize)?,
+            },
+            x => {
+                warn!("known record type not implemented {:?}", x);
+                Record::Unkown {
+                    data: self.consume_bytes(rd_length as usize)?,
+                }
+            }
+        };
 
-        Ok(ResourceRecord {
-            r_name,
-            r_type,
-            class_or_size,
-            ttl_or_flags,
+        Ok(resource_record::ResourceRecord {
+            name: r_name,
+            r#type: r_type,
+            class,
+            ttl,
             rd_length,
-            r_data,
+            data: r_data,
         })
-    }
-
-    fn consume_options(&mut self, len: usize) -> Result<Vec<Option<'a>>, RCode> {
-        let bytes = self.consume_bytes(len)?;
-        let mut options = vec![];
-
-        let mut pos = 0;
-
-        while pos < len {
-            let code = u16::from_be_bytes(
-                bytes[pos..pos + size_of::<u16>()]
-                    .try_into()
-                    .map_err(|_| RCode::FormatError)?,
-            );
-            pos += size_of::<u16>();
-
-            let length = u16::from_be_bytes(
-                bytes[pos..pos + size_of::<u16>()]
-                    .try_into()
-                    .map_err(|_| RCode::FormatError)?,
-            );
-            pos += size_of::<u16>();
-
-            let data = &bytes[pos..pos + length as usize];
-            pos += length as usize;
-
-            options.push(Option { code, length, data });
-        }
-
-        Ok(options)
     }
 }
