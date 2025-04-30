@@ -1,11 +1,11 @@
 use log::warn;
 
 use crate::{
-    header::{Flags, Header},
+    header::Header,
     packet::Packet,
     question::Question,
-    r#type::Type,
     resource_record::{self, Record},
+    r#type::Type,
 };
 
 #[derive(Debug)]
@@ -118,28 +118,11 @@ impl<'a> Parser<'a> {
     fn consume_header(&mut self) -> Result<Header, ParseError> {
         Ok(Header {
             id: self.consume_u16()?,
-            flags: self.consume_flags()?,
+            flags: self.consume_u16()?.into(),
             qdcount: self.consume_u16()?,
             ancount: self.consume_u16()?,
             nscount: self.consume_u16()?,
             arcount: self.consume_u16()?,
-        })
-    }
-
-    fn consume_flags(&mut self) -> Result<Flags, ParseError> {
-        if self.pos + 2 >= self.buf.len() {
-            return Err(ParseError::BufferOverflow);
-        }
-
-        Ok(Flags {
-            qr: (self.read_u8()? & 0b10000000) >> 7,
-            opcode: ((self.read_u8()? & 0b01111000) >> 3).into(),
-            aa: (self.read_u8()? & 0b00000100) >> 2,
-            tc: (self.read_u8()? & 0b00000010) >> 1,
-            rd: self.consume_u8()? & 0b00000001,
-            ra: (self.read_u8()? & 0b10000000) >> 7,
-            z: (self.read_u8()? & 0b01110000) >> 4,
-            rcode: (self.consume_u8()? & 0b00001111).into(),
         })
     }
 

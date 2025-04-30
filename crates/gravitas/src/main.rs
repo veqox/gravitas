@@ -1,6 +1,6 @@
 use std::{net::UdpSocket, time::Instant};
 
-use dns::{Parser, Serializer};
+use dns::proto::{Parser, Serializer};
 use log::{debug, error};
 
 fn main() {
@@ -22,6 +22,8 @@ fn main() {
         };
 
         debug!("packet parsed in {:?}", start.elapsed());
+
+        debug!("{:?}", packet);
 
         let mut buf = [0; 4096];
         let len = Serializer::serialize(packet, &mut buf);

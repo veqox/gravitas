@@ -1,6 +1,9 @@
 use log::warn;
 
-// https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2
+/// DNS type values as per [RFC 1035 Section 3.2.2](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
+/// and [RFC 3403 Section 4.1](https://www.rfc-editor.org/rfc/rfc3403#section-4.1)
+/// and [RFC 3596 Section 2.1](https://www.rfc-editor.org/rfc/rfc3596#section-2.1)
+/// and [RFC 6891 Section 6.1.1](https://www.rfc-editor.org/rfc/rfc6891#section-6.1.1)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Type {
@@ -12,10 +15,8 @@ pub enum Type {
     MX = 15,
     TXT = 16,
     AAAA = 28,
-    SRV = 33,
     NAPTR = 35,
     OPT = 41,
-    CAA = 257,
     Unknown(u16),
 }
 
@@ -30,10 +31,8 @@ impl From<u16> for Type {
             15 => Self::MX,
             16 => Self::TXT,
             28 => Self::AAAA,
-            33 => Self::SRV,
             35 => Self::NAPTR,
             41 => Self::OPT,
-            257 => Self::CAA,
             x => {
                 warn!("unkown value for record type {}", x);
                 Self::Unknown(x)
@@ -53,10 +52,8 @@ impl Into<u16> for Type {
             Self::MX => 15,
             Self::TXT => 16,
             Self::AAAA => 28,
-            Self::SRV => 33,
             Self::NAPTR => 35,
             Self::OPT => 41,
-            Self::CAA => 257,
             Self::Unknown(x) => x,
         }
     }

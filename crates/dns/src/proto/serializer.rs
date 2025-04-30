@@ -1,5 +1,5 @@
 use crate::{
-    header::{Flags, Header},
+    header::Header,
     packet::Packet,
     question::Question,
     resource_record::{Record, ResourceRecord},
@@ -65,18 +65,11 @@ impl<'a> Serializer<'a> {
 
     fn write_header(&mut self, header: Header) {
         self.write_u16(header.id);
-        self.write_flags(header.flags);
+        self.write_u16(header.flags.into());
         self.write_u16(header.qdcount);
         self.write_u16(header.ancount);
         self.write_u16(header.nscount);
         self.write_u16(header.arcount);
-    }
-
-    fn write_flags(&mut self, flags: Flags) {
-        self.write_u8(
-            flags.qr << 7 | Into::<u8>::into(flags.opcode) << 3 | flags.aa << 2 | flags.rd,
-        );
-        self.write_u8(flags.ra << 7 | flags.z << 4 | Into::<u8>::into(flags.rcode));
     }
 
     fn write_question(&mut self, question: Question<'a>) {
