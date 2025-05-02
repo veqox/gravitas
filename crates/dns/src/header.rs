@@ -85,16 +85,33 @@ impl Into<u16> for Flags {
     }
 }
 
-/// DNS opcode values as per [RFC 1035 Section 4.1.1](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-/// and [RFC 1996](https://www.rfc-editor.org/rfc/rfc1996)
-/// and [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136)
 #[derive(Debug)]
 #[repr(u8)]
 pub enum OpCode {
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
     Query = 0,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
+    /// [RFC 3425](https://www.rfc-editor.org/rfc/rfc3425#section-3)
+    ///
+    /// Obsolete
+    IQuery = 1,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
     Status = 2,
+
+    /// [RFC 1996](https://www.rfc-editor.org/rfc/rfc1996)
     Notify = 4,
+
+    /// [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136#section-1)
     Update = 5,
+
+    /// [RFC 8490](https://www.rfc-editor.org/rfc/rfc8490#section-5.4)
+    ///
+    /// DNS Stateful Operations
+    DSO = 6,
+
+    /// Unassigned values
     Unkown(u8),
 }
 
@@ -102,9 +119,11 @@ impl From<u8> for OpCode {
     fn from(value: u8) -> Self {
         match value {
             0 => Self::Query,
+            1 => Self::IQuery,
             2 => Self::Status,
             4 => Self::Notify,
             5 => Self::Update,
+            6 => Self::DSO,
             x => {
                 warn!("unkown value for opcode {}", x);
                 Self::Unkown(x)
@@ -117,31 +136,38 @@ impl Into<u8> for OpCode {
     fn into(self) -> u8 {
         match self {
             Self::Query => 0,
+            Self::IQuery => 1,
             Self::Status => 2,
             Self::Notify => 4,
             Self::Update => 5,
+            Self::DSO => 6,
             Self::Unkown(x) => x,
         }
     }
 }
 
-/// DNS rcode values as per [RFC 1035 Section 4.1.1](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
 #[derive(Debug)]
 #[repr(u8)]
 pub enum RCode {
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
     NoError = 0,
-    /// The name server was unable to interpret the query.
-    FormatError = 1,
-    /// The name server was unable to process this query due to a problem with the name server.
-    ServerFailure = 2,
-    /// Meaningful only for responses from an authoritative name server, this code signifies that the domain name referenced in the query does not exist.
-    NameError = 3,
-    /// The name server does not support the requested kind of query.
-    NotImplemented = 4,
-    /// The name server refuses to perform the specified operation for policy reasons.
-    /// For example, a name server may not wish to provide the information to the particular requester,
-    /// or a name server may not wish to perform a particular operation (e.g., zone transfer) for particular data.
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
+    FormatErr = 1,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
+    ServFail = 2,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
+    NXDomain = 3,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
+    NotImp = 4,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
     Refused = 5,
+
+    /// Unassigned values
     Unkown(u8),
 }
 
@@ -149,15 +175,12 @@ impl From<u8> for RCode {
     fn from(value: u8) -> Self {
         match value {
             0 => Self::NoError,
-            1 => Self::FormatError,
-            2 => Self::ServerFailure,
-            3 => Self::NameError,
-            4 => Self::NotImplemented,
+            1 => Self::FormatErr,
+            2 => Self::ServFail,
+            3 => Self::NXDomain,
+            4 => Self::NotImp,
             5 => Self::Refused,
-            x => {
-                warn!("unkown value for rcode {}", x);
-                Self::Unkown(x)
-            }
+            _ => Self::Unkown(value),
         }
     }
 }
@@ -166,10 +189,10 @@ impl Into<u8> for RCode {
     fn into(self) -> u8 {
         match self {
             Self::NoError => 0,
-            Self::FormatError => 1,
-            Self::ServerFailure => 2,
-            Self::NameError => 3,
-            Self::NotImplemented => 4,
+            Self::FormatErr => 1,
+            Self::ServFail => 2,
+            Self::NXDomain => 3,
+            Self::NotImp => 4,
             Self::Refused => 5,
             Self::Unkown(x) => x,
         }

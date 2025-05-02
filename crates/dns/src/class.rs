@@ -1,9 +1,9 @@
 use log::warn;
 
-/// DNS class values as per [RFC 1035 Section 3.2.4](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Class {
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4)
     IN = 1,
     Unkown(u16),
 }

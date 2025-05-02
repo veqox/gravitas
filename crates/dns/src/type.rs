@@ -1,21 +1,33 @@
 use log::warn;
 
-/// DNS type values as per [RFC 1035 Section 3.2.2](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-/// and [RFC 3403 Section 4.1](https://www.rfc-editor.org/rfc/rfc3403#section-4.1)
-/// and [RFC 3596 Section 2.1](https://www.rfc-editor.org/rfc/rfc3596#section-2.1)
-/// and [RFC 6891 Section 6.1.1](https://www.rfc-editor.org/rfc/rfc6891#section-6.1.1)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Type {
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
     A = 1,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
     NS = 2,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
     CNAME = 5,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
     SOA = 6,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
     PTR = 12,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
     MX = 15,
+
+    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
     TXT = 16,
+
+    /// [RFC 3596](https://www.rfc-editor.org/rfc/rfc3596#section-2.1)
     AAAA = 28,
-    NAPTR = 35,
+
+    /// [RFC 6891](https://www.rfc-editor.org/rfc/rfc6891#section-6.1.1)
     OPT = 41,
     Unknown(u16),
 }
@@ -31,7 +43,6 @@ impl From<u16> for Type {
             15 => Self::MX,
             16 => Self::TXT,
             28 => Self::AAAA,
-            35 => Self::NAPTR,
             41 => Self::OPT,
             x => {
                 warn!("unkown value for record type {}", x);
@@ -52,7 +63,6 @@ impl Into<u16> for Type {
             Self::MX => 15,
             Self::TXT => 16,
             Self::AAAA => 28,
-            Self::NAPTR => 35,
             Self::OPT => 41,
             Self::Unknown(x) => x,
         }
