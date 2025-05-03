@@ -1,4 +1,6 @@
-use crate::{class::Class, r#type::Type};
+use std::fmt::Debug;
+
+use crate::{DomainName, class::Class, r#type::Type};
 
 /// DNS question field layout as per [RFC 1035 Section 4.1.2](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.2)
 ///
@@ -14,9 +16,9 @@ use crate::{class::Class, r#type::Type};
 /// |                     QCLASS                    |
 /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Question<'a> {
-    pub name: Vec<&'a [u8]>,
+    pub name: DomainName<'a>,
     pub r#type: Type,
     pub class: Class,
 }

@@ -1,4 +1,5 @@
 use crate::{
+    DomainName,
     header::Header,
     packet::Packet,
     question::Question,
@@ -55,10 +56,10 @@ impl<'a> Serializer<'a> {
         self.pos += bytes.len();
     }
 
-    fn write_domain_name(&mut self, domain_name: Vec<&'a [u8]>) {
-        for label in domain_name {
+    fn write_domain_name(&mut self, domain_name: DomainName<'a>) {
+        for label in domain_name.labels {
             self.write_u8(label.len() as u8);
-            self.write_bytes(label);
+            self.write_bytes(label.as_bytes());
         }
         self.write_u8(0);
     }

@@ -1,4 +1,4 @@
-use crate::{class::Class, r#type::Type};
+use crate::{DomainName, class::Class, r#type::Type};
 
 /// DNS resource record field layout as per [RFC 1035 Section 4.1.3](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.3)
 ///
@@ -25,7 +25,7 @@ use crate::{class::Class, r#type::Type};
 /// ```
 #[derive(Debug)]
 pub struct ResourceRecord<'a> {
-    pub name: Vec<&'a [u8]>,
+    pub name: DomainName<'a>,
     pub r#type: Type,
     pub class: Class,
     pub ttl: u32,
@@ -58,7 +58,7 @@ pub enum Record<'a> {
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
     NS {
-        nsdname: Vec<&'a [u8]>,
+        nsdname: DomainName<'a>,
     },
 
     /// DNS CNAME record field layout as per [RFC 1035 Section 3.3.1](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.1)
@@ -71,7 +71,7 @@ pub enum Record<'a> {
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
     CNAME {
-        cname: Vec<&'a [u8]>,
+        cname: DomainName<'a>,
     },
 
     /// DNS SOA record field layout as per [RFC 1035 Section 3.3.13](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.13)
@@ -101,8 +101,8 @@ pub enum Record<'a> {
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
     SOA {
-        mname: Vec<&'a [u8]>,
-        rname: Vec<&'a [u8]>,
+        mname: DomainName<'a>,
+        rname: DomainName<'a>,
         serial: u32,
         refresh: u32,
         retry: u32,
@@ -119,7 +119,7 @@ pub enum Record<'a> {
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
     PTR {
-        ptrdname: Vec<&'a [u8]>,
+        ptrdname: DomainName<'a>,
     },
 
     /// DNS MX record field layout as per [RFC 1035 Section 3.3.9](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.9)
@@ -135,7 +135,7 @@ pub enum Record<'a> {
     /// ```
     MX {
         preference: u16,
-        exchange: Vec<&'a [u8]>,
+        exchange: DomainName<'a>,
     },
 
     /// DNS TXT record field layout as per [RFC 1035 Section 3.3.14](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.14)

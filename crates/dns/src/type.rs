@@ -1,34 +1,67 @@
 use log::warn;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 #[repr(u16)]
 pub enum Type {
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-    A = 1,
+    A,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-    NS = 2,
+    NS,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-    CNAME = 5,
+    CNAME,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-    SOA = 6,
+    SOA,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-    PTR = 12,
+    PTR,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-    MX = 15,
+    MX,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
-    TXT = 16,
+    TXT,
 
     /// [RFC 3596](https://www.rfc-editor.org/rfc/rfc3596#section-2.1)
-    AAAA = 28,
+    AAAA,
+
+    /// [RFC 2782](https://www.rfc-editor.org/rfc/rfc2782)
+    SRV,
 
     /// [RFC 6891](https://www.rfc-editor.org/rfc/rfc6891#section-6.1.1)
-    OPT = 41,
+    OPT,
+
+    /// [RFC 4034](https://www.rfc-editor.org/rfc/rfc4034)
+    DS,
+
+    /// [RFC 4034](https://www.rfc-editor.org/rfc/rfc4034)
+    RRSIG,
+
+    /// [RFC 4034](https://www.rfc-editor.org/rfc/rfc4034)
+    /// [RFC 9077](https://www.rfc-editor.org/rfc/rfc9077)
+    NSEC,
+
+    /// [RFC 4034](https://www.rfc-editor.org/rfc/rfc4034)
+    DNSKEY,
+
+    /// [RFC 5155](https://www.rfc-editor.org/rfc/rfc5155)
+    /// [RFC 9077](https://www.rfc-editor.org/rfc/rfc9077)
+    NSEC3,
+
+    /// [RFC 5155](https://www.rfc-editor.org/rfc/rfc5155)
+    NSEC3PARAM,
+
+    /// [RFC 9460](https://www.rfc-editor.org/rfc/rfc9460)
+    SVCB,
+
+    /// [RFC 9460](https://www.rfc-editor.org/rfc/rfc9460)
+    HTTPS,
+
+    /// [RFC 8659](https://www.rfc-editor.org/rfc/rfc8659)
+    CAA,
+
     Unknown(u16),
 }
 
@@ -43,10 +76,20 @@ impl From<u16> for Type {
             15 => Self::MX,
             16 => Self::TXT,
             28 => Self::AAAA,
+            33 => Self::SRV,
             41 => Self::OPT,
-            x => {
-                warn!("unkown value for record type {}", x);
-                Self::Unknown(x)
+            43 => Self::DS,
+            46 => Self::RRSIG,
+            47 => Self::NSEC,
+            48 => Self::DNSKEY,
+            50 => Self::NSEC3,
+            51 => Self::NSEC3PARAM,
+            64 => Self::SVCB,
+            65 => Self::HTTPS,
+            257 => Self::CAA,
+            _ => {
+                warn!("unkown value for record type {}", value);
+                Self::Unknown(value)
             }
         }
     }
@@ -63,8 +106,18 @@ impl Into<u16> for Type {
             Self::MX => 15,
             Self::TXT => 16,
             Self::AAAA => 28,
+            Self::SRV => 33,
             Self::OPT => 41,
-            Self::Unknown(x) => x,
+            Self::DS => 43,
+            Self::RRSIG => 46,
+            Self::NSEC => 47,
+            Self::DNSKEY => 48,
+            Self::NSEC3 => 50,
+            Self::NSEC3PARAM => 51,
+            Self::SVCB => 64,
+            Self::HTTPS => 65,
+            Self::CAA => 257,
+            Self::Unknown(code) => code,
         }
     }
 }

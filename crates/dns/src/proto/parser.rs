@@ -1,6 +1,7 @@
 use log::warn;
 
 use crate::{
+    DomainName,
     header::Header,
     packet::Packet,
     question::Question,
@@ -10,8 +11,9 @@ use crate::{
 
 #[derive(Debug)]
 pub enum ParseError {
-    BufferOverflow,
+    BufferOverflow(usize, usize),
     InvalidLabelLength(usize),
+    InvalidUtf8,
     NotImplemented,
 }
 
@@ -60,6 +62,16 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn seek(&mut self, pos: usize) -> Result<(), ParseError> {
+        if pos > self.buf.len() {
+            return Err(ParseError::BufferOverflow(self.pos, self.buf.len()));
+        }
+
+        self.pos = pos;
+
+        Ok(())
+    }
+
     fn consume_u32(&mut self) -> Result<u32, ParseError> {
         let value = u32::from_be_bytes([
             self.consume_u8()?,
@@ -83,7 +95,7 @@ impl<'a> Parser<'a> {
 
     fn read_u8(&self) -> Result<u8, ParseError> {
         if self.pos >= self.buf.len() {
-            return Err(ParseError::BufferOverflow);
+            return Err(ParseError::BufferOverflow(self.pos, self.buf.len()));
         }
 
         Ok(self.buf[self.pos])
@@ -91,7 +103,7 @@ impl<'a> Parser<'a> {
 
     fn consume_bytes(&mut self, len: usize) -> Result<&'a [u8], ParseError> {
         if self.pos + len > self.buf.len() {
-            return Err(ParseError::BufferOverflow);
+            return Err(ParseError::BufferOverflow(self.pos + len, self.buf.len()));
         }
 
         let bytes = &self.buf[self.pos..self.pos + len];
@@ -99,7 +111,11 @@ impl<'a> Parser<'a> {
         Ok(bytes)
     }
 
-    fn consume_domain_name(&mut self) -> Result<Vec<&'a [u8]>, ParseError> {
+    fn consume_domain_name(&mut self) -> Result<DomainName<'a>, ParseError> {
+        Ok(DomainName::from_labels(self.consume_labels()?))
+    }
+
+    fn consume_labels(&mut self) -> Result<Vec<&'a str>, ParseError> {
         let mut labels = vec![];
 
         loop {
@@ -107,7 +123,25 @@ impl<'a> Parser<'a> {
 
             match len {
                 0 => break,
-                1..=63 => labels.push(self.consume_bytes(len)?),
+                len if len & 0xC0 == 0xC0 => {
+                    let pointer: u16 = (((len & 0x3F) as u16) << 8) | self.consume_u8()? as u16;
+
+                    let pos = self.pos;
+
+                    self.seek(pointer as usize)?;
+
+                    labels.extend(self.consume_labels()?);
+
+                    self.seek(pos)?;
+
+                    break;
+                }
+                1..=63 => {
+                    let label = str::from_utf8(self.consume_bytes(len)?)
+                        .map_err(|_| ParseError::InvalidUtf8)?;
+
+                    labels.push(label);
+                }
                 _ => return Err(ParseError::InvalidLabelLength(len)),
             }
         }

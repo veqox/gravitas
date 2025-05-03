@@ -89,29 +89,20 @@ impl Into<u16> for Flags {
 #[repr(u8)]
 pub enum OpCode {
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    Query = 0,
+    Query,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    /// [RFC 3425](https://www.rfc-editor.org/rfc/rfc3425#section-3)
-    ///
-    /// Obsolete
-    IQuery = 1,
-
-    /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    Status = 2,
+    Status,
 
     /// [RFC 1996](https://www.rfc-editor.org/rfc/rfc1996)
-    Notify = 4,
+    Notify,
 
     /// [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136#section-1)
-    Update = 5,
+    Update,
 
     /// [RFC 8490](https://www.rfc-editor.org/rfc/rfc8490#section-5.4)
-    ///
-    /// DNS Stateful Operations
-    DSO = 6,
+    DSO,
 
-    /// Unassigned values
     Unkown(u8),
 }
 
@@ -119,14 +110,13 @@ impl From<u8> for OpCode {
     fn from(value: u8) -> Self {
         match value {
             0 => Self::Query,
-            1 => Self::IQuery,
             2 => Self::Status,
             4 => Self::Notify,
             5 => Self::Update,
             6 => Self::DSO,
-            x => {
-                warn!("unkown value for opcode {}", x);
-                Self::Unkown(x)
+            _ => {
+                warn!("unkown value for opcode {}", value);
+                Self::Unkown(value)
             }
         }
     }
@@ -136,7 +126,6 @@ impl Into<u8> for OpCode {
     fn into(self) -> u8 {
         match self {
             Self::Query => 0,
-            Self::IQuery => 1,
             Self::Status => 2,
             Self::Notify => 4,
             Self::Update => 5,
@@ -150,25 +139,71 @@ impl Into<u8> for OpCode {
 #[repr(u8)]
 pub enum RCode {
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    NoError = 0,
+    NoError,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    FormatErr = 1,
+    FormatErr,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    ServFail = 2,
+    ServFail,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    NXDomain = 3,
+    NXDomain,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    NotImp = 4,
+    NotImp,
 
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
-    Refused = 5,
+    Refused,
 
-    /// Unassigned values
-    Unkown(u8),
+    /// [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136)
+    YXDomain,
+
+    /// [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136)
+    YXRRSet,
+
+    /// [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136)
+    NXRRSet,
+
+    /// [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136)
+    /// [RFC 8945](https://www.rfc-editor.org/rfc/rfc8945)
+    NotAuth,
+
+    /// [RFC 2136](https://www.rfc-editor.org/rfc/rfc2136)
+    NotZone,
+
+    /// [RFC 8490](https://www.rfc-editor.org/rfc/rfc8490)
+    DSOTYPENI,
+
+    /// [RFC 6891](https://www.rfc-editor.org/rfc/rfc6891)
+    /// [RFC 8945](https://www.rfc-editor.org/rfc/rfc8945)
+    BADVERS,
+
+    /// [RFC 8945](https://www.rfc-editor.org/rfc/rfc8945)
+    BADSIG,
+
+    /// [RFC 8945](https://www.rfc-editor.org/rfc/rfc8945)
+    BADKEY,
+
+    /// [RFC 8945](https://www.rfc-editor.org/rfc/rfc8945)
+    BADTIME,
+
+    /// [RFC 2930](https://www.rfc-editor.org/rfc/rfc2930)
+    BADMODE,
+
+    /// [RFC 2930](https://www.rfc-editor.org/rfc/rfc2930)
+    BADNAME,
+
+    /// [RFC 2930](https://www.rfc-editor.org/rfc/rfc2930)
+    BADALG,
+
+    /// [RFC 8945](https://www.rfc-editor.org/rfc/rfc8945)
+    BADTRUNC,
+
+    /// [RFC 7873](https://www.rfc-editor.org/rfc/rfc7873)
+    BADCOOKIE,
+
+    Unknown(u8),
 }
 
 impl From<u8> for RCode {
@@ -180,7 +215,21 @@ impl From<u8> for RCode {
             3 => Self::NXDomain,
             4 => Self::NotImp,
             5 => Self::Refused,
-            _ => Self::Unkown(value),
+            6 => Self::YXDomain,
+            7 => Self::YXRRSet,
+            8 => Self::NXRRSet,
+            9 => Self::NotAuth,
+            10 => Self::NotZone,
+            11 => Self::DSOTYPENI,
+            16 => Self::BADSIG,
+            17 => Self::BADKEY,
+            18 => Self::BADTIME,
+            19 => Self::BADMODE,
+            20 => Self::BADNAME,
+            21 => Self::BADALG,
+            22 => Self::BADTRUNC,
+            23 => Self::BADCOOKIE,
+            other => Self::Unknown(other),
         }
     }
 }
@@ -194,7 +243,21 @@ impl Into<u8> for RCode {
             Self::NXDomain => 3,
             Self::NotImp => 4,
             Self::Refused => 5,
-            Self::Unkown(x) => x,
+            Self::YXDomain => 6,
+            Self::YXRRSet => 7,
+            Self::NXRRSet => 8,
+            Self::NotAuth => 9,
+            Self::NotZone => 10,
+            Self::DSOTYPENI => 11,
+            Self::BADVERS | Self::BADSIG => 16,
+            Self::BADKEY => 17,
+            Self::BADTIME => 18,
+            Self::BADMODE => 19,
+            Self::BADNAME => 20,
+            Self::BADALG => 21,
+            Self::BADTRUNC => 22,
+            Self::BADCOOKIE => 23,
+            Self::Unknown(x) => x,
         }
     }
 }

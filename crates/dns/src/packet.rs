@@ -5,7 +5,7 @@ use crate::resource_record::ResourceRecord;
 /// DNS packet layout as per [RFC 1035 Section 4.1](https://www.rfc-editor.org/rfc/rfc1035#section-4.1)
 ///
 /// ```text
-/// +---------------------
+/// +---------------------+
 /// |        Header       |
 /// +---------------------+
 /// |       Question      | the question for the name server

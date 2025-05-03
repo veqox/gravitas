@@ -8,3 +8,4 @@ dns = { workspace = true }
 log = { workspace = true }
 
 env_logger = "0.11.8"
+smol = "2.0.2"
