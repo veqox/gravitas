@@ -1,3 +1,5 @@
+use std::u16;
+
 use crate::{DomainName, class::Class, r#type::Type};
 
 /// DNS resource record field layout as per [RFC 1035 Section 4.1.3](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.3)
@@ -175,28 +177,17 @@ impl<'a> Record<'a> {
             Self::A { address } => address.len(),
             Self::NS { nsdname } => nsdname.size(),
             Self::CNAME { cname } => cname.size(),
-            Self::SOA {
-                mname,
-                rname,
-                serial,
-                refresh,
-                retry,
-                expire,
-                minimum,
-            } => {
+            Self::SOA { mname, rname, .. } => {
                 mname.size()
                     + rname.size()
-                    + size_of_val(serial)
-                    + size_of_val(refresh)
-                    + size_of_val(retry)
-                    + size_of_val(expire)
-                    + size_of_val(minimum)
+                    + size_of::<u32>()
+                    + size_of::<u32>()
+                    + size_of::<u32>()
+                    + size_of::<u32>()
+                    + size_of::<u32>()
             }
             Self::PTR { ptrdname } => ptrdname.size(),
-            Self::MX {
-                preference,
-                exchange,
-            } => size_of_val(preference) + exchange.size(),
+            Self::MX { exchange, .. } => size_of::<u16>() + exchange.size(),
             Self::TXT { text } => text.len(),
             Self::AAAA { address } => address.len(),
         }
@@ -229,7 +220,7 @@ pub enum Option<'a> {
 impl Option<'_> {
     pub fn size(&self) -> usize {
         match self {
-            Self::Unknown { code, len, data } => size_of_val(code) + size_of_val(len) + data.len(),
+            Self::Unknown { data, .. } => size_of::<u16>() + size_of::<u16>() + data.len(),
         }
     }
 }
