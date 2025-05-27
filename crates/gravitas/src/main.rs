@@ -1,7 +1,7 @@
 use std::net::UdpSocket;
 use std::time::Instant;
 
-use dns::proto::Parser;
+use dns::proto::{Parser, Serializer};
 use log::{debug, error, info};
 
 const LISTEN_ADDR: &str = "0.0.0.0:5300";
@@ -39,5 +39,16 @@ fn main() {
         debug!("packet parsed in {:?}", start.elapsed());
 
         debug!("{:?}", packet);
+
+        let mut serialize_buf = [0; 4096];
+
+        let serialize_len = Serializer::serialize(packet, &mut serialize_buf);
+
+        if buf[..len] != serialize_buf[..serialize_len] {
+            error!("original:   {:?}", &buf[..len]);
+            error!("serialzied: {:?}", &serialize_buf[..serialize_len]);
+        } else {
+            debug!("serialization successful: buffers match");
+        }
     }
 }
