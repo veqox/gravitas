@@ -1,4 +1,5 @@
 use log::warn;
+use std::str;
 
 use crate::{
     DomainName,
@@ -73,18 +74,16 @@ impl<'a> Parser<'a> {
     }
 
     fn consume_u32(&mut self) -> Result<u32, ParseError> {
-        let value = u32::from_be_bytes([
+        Ok(u32::from_be_bytes([
             self.consume_u8()?,
             self.consume_u8()?,
             self.consume_u8()?,
             self.consume_u8()?,
-        ]);
-        Ok(value)
+        ]))
     }
 
     fn consume_u16(&mut self) -> Result<u16, ParseError> {
-        let value = u16::from_be_bytes([self.consume_u8()?, self.consume_u8()?]);
-        Ok(value)
+        Ok(u16::from_be_bytes([self.consume_u8()?, self.consume_u8()?]))
     }
 
     fn consume_u8(&mut self) -> Result<u8, ParseError> {
@@ -128,7 +127,7 @@ impl<'a> Parser<'a> {
 
                     let pos = self.pos;
 
-                    self.seek(pointer as usize)?;
+                    self.seek(pointer.into())?;
 
                     labels.extend(self.consume_labels()?);
 
@@ -178,7 +177,7 @@ impl<'a> Parser<'a> {
         let r_name = self.consume_domain_name()?;
         let r_type = self.consume_u16()?.into();
         let class = self.consume_u16()?.into();
-        let ttl = self.consume_u32()?.into();
+        let ttl = self.consume_u32()?;
         let rd_length = self.consume_u16()?;
 
         let r_data = match &r_type {
@@ -208,18 +207,37 @@ impl<'a> Parser<'a> {
                 exchange: self.consume_domain_name()?,
             },
             Type::TXT => Record::TXT {
-                text: self.consume_bytes(rd_length as usize)?,
+                text: self.consume_bytes(rd_length.into())?,
             },
             Type::AAAA => Record::AAAA {
                 address: self.consume_bytes(16)?.try_into().unwrap(),
             },
+            Type::OPT => Record::OPT {
+                options: {
+                    let mut options = Vec::new();
+                    let start = self.pos;
+
+                    while (self.pos - start) < rd_length.into() {
+                        options.push({
+                            let code = self.consume_u16()?.into();
+                            let len = self.consume_u16()?;
+                            let data = self.consume_bytes(len.into())?;
+
+                            resource_record::Option { code, len, data }
+                        });
+                    }
+
+                    options
+                },
+            },
+
             Type::Unknown(_) => Record::Unkown {
-                data: self.consume_bytes(rd_length as usize)?,
+                data: self.consume_bytes(rd_length.into())?,
             },
             x => {
                 warn!("known record type not implemented {:?}", x);
                 Record::Unkown {
-                    data: self.consume_bytes(rd_length as usize)?,
+                    data: self.consume_bytes(rd_length.into())?,
                 }
             }
         };

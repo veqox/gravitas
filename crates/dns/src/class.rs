@@ -1,5 +1,3 @@
-use log::warn;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum Class {
@@ -18,7 +16,8 @@ pub enum Class {
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.4)
     ANY,
 
-    Unkown(u16),
+    /// [RFC 6891](https://www.rfc-editor.org/rfc/rfc6891#section-6.1.2)
+    OPT(u16),
 }
 
 impl From<u16> for Class {
@@ -29,10 +28,7 @@ impl From<u16> for Class {
             4 => Self::HS,
             254 => Self::NONE,
             255 => Self::ANY,
-            x => {
-                warn!("unkown value for record class {}", x);
-                Self::Unkown(x)
-            }
+            x => Self::OPT(x.max(512)),
         }
     }
 }
@@ -45,7 +41,7 @@ impl Into<u16> for Class {
             Self::HS => 4,
             Self::NONE => 254,
             Self::ANY => 255,
-            Self::Unkown(x) => x,
+            Self::OPT(x) => x,
         }
     }
 }

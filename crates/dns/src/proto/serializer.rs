@@ -117,6 +117,13 @@ impl<'a> Serializer<'a> {
             }
             Record::TXT { text } => self.write_bytes(text),
             Record::AAAA { address } => self.write_bytes(address),
+            Record::OPT { options } => {
+                for option in options {
+                    self.write_u16(option.code.into());
+                    self.write_u16(option.len);
+                    self.write_bytes(option.data);
+                }
+            }
             Record::Unkown { data } => self.write_bytes(data),
         };
     }
