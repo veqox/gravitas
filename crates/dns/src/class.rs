@@ -33,15 +33,15 @@ impl From<u16> for Class {
     }
 }
 
-impl Into<u16> for Class {
-    fn into(self) -> u16 {
-        match self {
-            Self::IN => 1,
-            Self::CH => 3,
-            Self::HS => 4,
-            Self::NONE => 254,
-            Self::ANY => 255,
-            Self::OPT(x) => x,
+impl From<Class> for u16 {
+    fn from(val: Class) -> Self {
+        match val {
+            Class::IN => 1,
+            Class::CH => 3,
+            Class::HS => 4,
+            Class::NONE => 254,
+            Class::ANY => 255,
+            Class::OPT(x) => x,
         }
     }
 }

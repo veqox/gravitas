@@ -54,33 +54,33 @@ pub struct Flags {
 impl From<u16> for Flags {
     fn from(value: u16) -> Self {
         Flags {
-            qr: (value >> 15 & 0b1) as u8,
-            opcode: ((value >> 11 & 0b1111) as u8).into(),
-            aa: (value >> 10 & 0b1) as u8,
-            tc: (value >> 9 & 0b1) as u8,
-            rd: (value >> 8 & 0b1) as u8,
-            ra: (value >> 7 & 0b1) as u8,
-            z: (value >> 6 & 0b1) as u8,
-            ad: (value >> 5 & 0b1) as u8,
-            cd: (value >> 4 & 0b1) as u8,
+            qr: ((value >> 15) & 0b1) as u8,
+            opcode: (((value >> 11) & 0b1111) as u8).into(),
+            aa: ((value >> 10) & 0b1) as u8,
+            tc: ((value >> 9) & 0b1) as u8,
+            rd: ((value >> 8) & 0b1) as u8,
+            ra: ((value >> 7) & 0b1) as u8,
+            z: ((value >> 6) & 0b1) as u8,
+            ad: ((value >> 5) & 0b1) as u8,
+            cd: ((value >> 4) & 0b1) as u8,
             rcode: ((value & 0b1111) as u8).into(),
         }
     }
 }
 
-impl Into<u16> for Flags {
-    fn into(self) -> u16 {
+impl From<Flags> for u16 {
+    fn from(val: Flags) -> Self {
         let mut value = 0u16;
-        value |= (self.qr as u16) << 15;
-        value |= (Into::<u8>::into(self.opcode) as u16 & 0b1111) << 11;
-        value |= (self.aa as u16) << 10;
-        value |= (self.tc as u16) << 9;
-        value |= (self.rd as u16) << 8;
-        value |= (self.ra as u16) << 7;
-        value |= (self.z as u16) << 6;
-        value |= (self.ad as u16) << 5;
-        value |= (self.cd as u16) << 4;
-        value |= Into::<u8>::into(self.rcode) as u16 & 0b1111;
+        value |= (val.qr as u16) << 15;
+        value |= (Into::<u8>::into(val.opcode) as u16 & 0b1111) << 11;
+        value |= (val.aa as u16) << 10;
+        value |= (val.tc as u16) << 9;
+        value |= (val.rd as u16) << 8;
+        value |= (val.ra as u16) << 7;
+        value |= (val.z as u16) << 6;
+        value |= (val.ad as u16) << 5;
+        value |= (val.cd as u16) << 4;
+        value |= Into::<u8>::into(val.rcode) as u16 & 0b1111;
         value
     }
 }
@@ -122,15 +122,15 @@ impl From<u8> for OpCode {
     }
 }
 
-impl Into<u8> for OpCode {
-    fn into(self) -> u8 {
-        match self {
-            Self::Query => 0,
-            Self::Status => 2,
-            Self::Notify => 4,
-            Self::Update => 5,
-            Self::DSO => 6,
-            Self::Unkown(x) => x,
+impl From<OpCode> for u8 {
+    fn from(val: OpCode) -> Self {
+        match val {
+            OpCode::Query => 0,
+            OpCode::Status => 2,
+            OpCode::Notify => 4,
+            OpCode::Update => 5,
+            OpCode::DSO => 6,
+            OpCode::Unkown(x) => x,
         }
     }
 }
@@ -234,30 +234,30 @@ impl From<u8> for RCode {
     }
 }
 
-impl Into<u8> for RCode {
-    fn into(self) -> u8 {
-        match self {
-            Self::NoError => 0,
-            Self::FormatErr => 1,
-            Self::ServFail => 2,
-            Self::NXDomain => 3,
-            Self::NotImp => 4,
-            Self::Refused => 5,
-            Self::YXDomain => 6,
-            Self::YXRRSet => 7,
-            Self::NXRRSet => 8,
-            Self::NotAuth => 9,
-            Self::NotZone => 10,
-            Self::DSOTYPENI => 11,
-            Self::BADVERS | Self::BADSIG => 16,
-            Self::BADKEY => 17,
-            Self::BADTIME => 18,
-            Self::BADMODE => 19,
-            Self::BADNAME => 20,
-            Self::BADALG => 21,
-            Self::BADTRUNC => 22,
-            Self::BADCOOKIE => 23,
-            Self::Unknown(x) => x,
+impl From<RCode> for u8 {
+    fn from(val: RCode) -> Self {
+        match val {
+            RCode::NoError => 0,
+            RCode::FormatErr => 1,
+            RCode::ServFail => 2,
+            RCode::NXDomain => 3,
+            RCode::NotImp => 4,
+            RCode::Refused => 5,
+            RCode::YXDomain => 6,
+            RCode::YXRRSet => 7,
+            RCode::NXRRSet => 8,
+            RCode::NotAuth => 9,
+            RCode::NotZone => 10,
+            RCode::DSOTYPENI => 11,
+            RCode::BADVERS | RCode::BADSIG => 16,
+            RCode::BADKEY => 17,
+            RCode::BADTIME => 18,
+            RCode::BADMODE => 19,
+            RCode::BADNAME => 20,
+            RCode::BADALG => 21,
+            RCode::BADTRUNC => 22,
+            RCode::BADCOOKIE => 23,
+            RCode::Unknown(x) => x,
         }
     }
 }

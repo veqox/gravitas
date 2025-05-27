@@ -199,6 +199,7 @@ pub struct Option<'a> {
     pub data: &'a [u8],
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum OptionCode {
     /// [RFC 6891](https://www.rfc-editor.org/rfc/rfc6891)

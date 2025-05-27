@@ -95,29 +95,29 @@ impl From<u16> for Type {
     }
 }
 
-impl Into<u16> for Type {
-    fn into(self) -> u16 {
-        match self {
-            Self::A => 1,
-            Self::NS => 2,
-            Self::CNAME => 5,
-            Self::SOA => 6,
-            Self::PTR => 12,
-            Self::MX => 15,
-            Self::TXT => 16,
-            Self::AAAA => 28,
-            Self::SRV => 33,
-            Self::OPT => 41,
-            Self::DS => 43,
-            Self::RRSIG => 46,
-            Self::NSEC => 47,
-            Self::DNSKEY => 48,
-            Self::NSEC3 => 50,
-            Self::NSEC3PARAM => 51,
-            Self::SVCB => 64,
-            Self::HTTPS => 65,
-            Self::CAA => 257,
-            Self::Unknown(code) => code,
+impl From<Type> for u16 {
+    fn from(val: Type) -> Self {
+        match val {
+            Type::A => 1,
+            Type::NS => 2,
+            Type::CNAME => 5,
+            Type::SOA => 6,
+            Type::PTR => 12,
+            Type::MX => 15,
+            Type::TXT => 16,
+            Type::AAAA => 28,
+            Type::SRV => 33,
+            Type::OPT => 41,
+            Type::DS => 43,
+            Type::RRSIG => 46,
+            Type::NSEC => 47,
+            Type::DNSKEY => 48,
+            Type::NSEC3 => 50,
+            Type::NSEC3PARAM => 51,
+            Type::SVCB => 64,
+            Type::HTTPS => 65,
+            Type::CAA => 257,
+            Type::Unknown(code) => code,
         }
     }
 }
