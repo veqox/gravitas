@@ -103,7 +103,7 @@ pub enum OpCode {
     /// [RFC 8490](https://www.rfc-editor.org/rfc/rfc8490#section-5.4)
     DSO,
 
-    Unkown(u8),
+    Unknown(u8),
 }
 
 impl From<u8> for OpCode {
@@ -115,8 +115,8 @@ impl From<u8> for OpCode {
             5 => Self::Update,
             6 => Self::DSO,
             _ => {
-                warn!("unkown value for opcode {}", value);
-                Self::Unkown(value)
+                warn!("unknown value for opcode {}", value);
+                Self::Unknown(value)
             }
         }
     }
@@ -130,7 +130,7 @@ impl From<OpCode> for u8 {
             OpCode::Notify => 4,
             OpCode::Update => 5,
             OpCode::DSO => 6,
-            OpCode::Unkown(x) => x,
+            OpCode::Unknown(x) => x,
         }
     }
 }

@@ -124,7 +124,7 @@ impl<'a> Serializer<'a> {
                     self.write_bytes(option.data);
                 }
             }
-            Record::Unkown { data } => self.write_bytes(data),
+            Record::Unknown { data } => self.write_bytes(data),
         };
     }
 }

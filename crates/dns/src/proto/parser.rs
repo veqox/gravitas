@@ -231,12 +231,12 @@ impl<'a> Parser<'a> {
                 },
             },
 
-            Type::Unknown(_) => Record::Unkown {
+            Type::Unknown(_) => Record::Unknown {
                 data: self.consume_bytes(rd_length.into())?,
             },
             x => {
                 warn!("known record type not implemented {:?}", x);
-                Record::Unkown {
+                Record::Unknown {
                     data: self.consume_bytes(rd_length.into())?,
                 }
             }

@@ -88,7 +88,7 @@ impl From<u16> for Type {
             65 => Self::HTTPS,
             257 => Self::CAA,
             _ => {
-                warn!("unkown value for record type {}", value);
+                warn!("unknown value for record type {}", value);
                 Self::Unknown(value)
             }
         }

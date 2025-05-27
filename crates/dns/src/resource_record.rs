@@ -187,7 +187,7 @@ pub enum Record<'a> {
         options: Vec<Option<'a>>,
     },
 
-    Unkown {
+    Unknown {
         data: &'a [u8],
     },
 }
