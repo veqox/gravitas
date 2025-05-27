@@ -46,7 +46,7 @@ fn main() {
 
         if buf[..len] != serialize_buf[..serialize_len] {
             error!("original:   {:?}", &buf[..len]);
-            error!("serialzied: {:?}", &serialize_buf[..serialize_len]);
+            error!("serialized: {:?}", &serialize_buf[..serialize_len]);
         } else {
             debug!("serialization successful: buffers match");
         }
