@@ -14,6 +14,5 @@ pub use crate::header::OpCode;
 pub use crate::header::RCode;
 pub use crate::packet::Packet;
 pub use crate::question::Question;
-pub use crate::resource_record::Record;
 pub use crate::resource_record::ResourceRecord;
 pub use crate::r#type::Type;

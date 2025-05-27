@@ -24,13 +24,24 @@ use crate::{DomainName, class::Class, r#type::Type};
 /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
 /// ```
 #[derive(Debug)]
-pub struct ResourceRecord<'a> {
-    pub name: DomainName<'a>,
-    pub r#type: Type,
-    pub class: Class,
-    pub ttl: u32,
-    pub rd_length: u16,
-    pub data: Record<'a>,
+pub enum ResourceRecord<'a> {
+    Record {
+        name: DomainName<'a>,
+        ttl: u32,
+        data: Record<'a>,
+    },
+    OPTRecord {
+        size: u16,
+        flags: u32,
+        options: Vec<Option<'a>>,
+    },
+    Unknown {
+        name: DomainName<'a>,
+        r#type: Type,
+        class: Class,
+        ttl: u32,
+        data: &'a [u8],
+    },
 }
 
 #[derive(Debug)]
@@ -44,9 +55,7 @@ pub enum Record<'a> {
     /// |                                               |
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
-    A {
-        address: &'a [u8; 4],
-    },
+    A { address: &'a [u8; 4] },
 
     /// DNS NS record field layout as per [RFC 1035 Section 3.3.11](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.11)
     ///
@@ -57,9 +66,7 @@ pub enum Record<'a> {
     /// /                                               /
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
-    NS {
-        nsdname: DomainName<'a>,
-    },
+    NS { nsdname: DomainName<'a> },
 
     /// DNS CNAME record field layout as per [RFC 1035 Section 3.3.1](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.1)
     ///
@@ -70,9 +77,7 @@ pub enum Record<'a> {
     /// /                                               /
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
-    CNAME {
-        cname: DomainName<'a>,
-    },
+    CNAME { cname: DomainName<'a> },
 
     /// DNS SOA record field layout as per [RFC 1035 Section 3.3.13](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.13)
     ///
@@ -118,9 +123,7 @@ pub enum Record<'a> {
     /// /                   PTRDNAME                    /
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
-    PTR {
-        ptrdname: DomainName<'a>,
-    },
+    PTR { ptrdname: DomainName<'a> },
 
     /// DNS MX record field layout as per [RFC 1035 Section 3.3.9](https://www.rfc-editor.org/rfc/rfc1035#section-3.3.9)
     ///
@@ -146,9 +149,7 @@ pub enum Record<'a> {
     /// /                   TXT-DATA                    /
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
-    TXT {
-        text: &'a [u8],
-    },
+    TXT { text: &'a [u8] },
 
     /// DNS AAAA record field layout as per [RFC 3596 Section 2.2](https://www.rfc-editor.org/rfc/rfc3596#section-2.2)
     ///
@@ -165,38 +166,72 @@ pub enum Record<'a> {
     /// |                                               |
     /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
     /// ```
-    AAAA {
-        address: &'a [u8; 16],
-    },
+    AAAA { address: &'a [u8; 16] },
+}
 
-    /// DNS OPT pseudo rr field layout as per [RFC 6891 Section 6.1.2](https://www.rfc-editor.org/rfc/rfc6891#section-6.1.2)
-    ///
-    /// ```text
-    ///   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
-    /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    /// |                   OPTION-CODE                 |
-    /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    /// |                  OPTION-LENGTH                |
-    /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    /// |                                               |
-    /// /                   OPTION-DATA                 /
-    /// /                                               /
-    /// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-    /// ```
-    OPT {
-        options: Vec<Option<'a>>,
-    },
+impl<'a> Record<'a> {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::A { address } => address.len(),
+            Self::NS { nsdname } => nsdname.size(),
+            Self::CNAME { cname } => cname.size(),
+            Self::SOA {
+                mname,
+                rname,
+                serial,
+                refresh,
+                retry,
+                expire,
+                minimum,
+            } => {
+                mname.size()
+                    + rname.size()
+                    + size_of_val(serial)
+                    + size_of_val(refresh)
+                    + size_of_val(retry)
+                    + size_of_val(expire)
+                    + size_of_val(minimum)
+            }
+            Self::PTR { ptrdname } => ptrdname.size(),
+            Self::MX {
+                preference,
+                exchange,
+            } => size_of_val(preference) + exchange.size(),
+            Self::TXT { text } => text.len(),
+            Self::AAAA { address } => address.len(),
+        }
+    }
+}
 
+/// DNS OPT pseudo rr field layout as per [RFC 6891 Section 6.1.2](https://www.rfc-editor.org/rfc/rfc6891#section-6.1.2)
+///
+/// ```text
+///   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15
+/// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+/// |                   OPTION-CODE                 |
+/// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+/// |                  OPTION-LENGTH                |
+/// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+/// |                                               |
+/// /                   OPTION-DATA                 /
+/// /                                               /
+/// +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+/// ```
+#[derive(Debug)]
+pub enum Option<'a> {
     Unknown {
+        code: OptionCode,
+        len: u16,
         data: &'a [u8],
     },
 }
 
-#[derive(Debug)]
-pub struct Option<'a> {
-    pub code: OptionCode,
-    pub len: u16,
-    pub data: &'a [u8],
+impl Option<'_> {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Unknown { code, len, data } => size_of_val(code) + size_of_val(len) + data.len(),
+        }
+    }
 }
 
 #[allow(clippy::upper_case_acronyms)]

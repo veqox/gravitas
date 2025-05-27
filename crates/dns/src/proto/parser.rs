@@ -2,7 +2,7 @@ use log::warn;
 use std::str;
 
 use crate::{
-    DomainName,
+    DomainName, ResourceRecord,
     header::Header,
     packet::Packet,
     question::Question,
@@ -14,6 +14,7 @@ use crate::{
 pub enum ParseError {
     BufferOverflow(usize, usize),
     InvalidLabelLength(usize),
+    FormatError,
     InvalidUtf8,
     NotImplemented,
 }
@@ -171,48 +172,83 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn consume_resource_record(
-        &mut self,
-    ) -> Result<resource_record::ResourceRecord<'a>, ParseError> {
-        let r_name = self.consume_domain_name()?;
-        let r_type = self.consume_u16()?.into();
-        let class = self.consume_u16()?.into();
+    fn consume_resource_record(&mut self) -> Result<ResourceRecord<'a>, ParseError> {
+        let name = self.consume_domain_name()?;
+        let r#type = self.consume_u16()?;
+        let class = self.consume_u16()?;
         let ttl = self.consume_u32()?;
         let rd_length = self.consume_u16()?;
 
-        let r_data = match &r_type {
-            Type::A => Record::A {
-                address: (self.consume_bytes(4)?).try_into().unwrap(),
+        Ok(match &r#type.into() {
+            Type::A => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::A {
+                    address: self
+                        .consume_bytes(rd_length.into())?
+                        .try_into()
+                        .map_err(|_| ParseError::FormatError)?,
+                },
             },
-            Type::NS => Record::NS {
-                nsdname: self.consume_domain_name()?,
+            Type::NS => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::NS {
+                    nsdname: self.consume_domain_name()?,
+                },
             },
-            Type::CNAME => Record::CNAME {
-                cname: self.consume_domain_name()?,
+            Type::CNAME => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::CNAME {
+                    cname: self.consume_domain_name()?,
+                },
             },
-            Type::SOA => Record::SOA {
-                mname: self.consume_domain_name()?,
-                rname: self.consume_domain_name()?,
-                serial: self.consume_u32()?,
-                refresh: self.consume_u32()?,
-                retry: self.consume_u32()?,
-                expire: self.consume_u32()?,
-                minimum: self.consume_u32()?,
+            Type::SOA => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::SOA {
+                    mname: self.consume_domain_name()?,
+                    rname: self.consume_domain_name()?,
+                    serial: self.consume_u32()?,
+                    refresh: self.consume_u32()?,
+                    retry: self.consume_u32()?,
+                    expire: self.consume_u32()?,
+                    minimum: self.consume_u32()?,
+                },
             },
-            Type::PTR => Record::PTR {
-                ptrdname: self.consume_domain_name()?,
+            Type::PTR => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::PTR {
+                    ptrdname: self.consume_domain_name()?,
+                },
             },
-            Type::MX => Record::MX {
-                preference: self.consume_u16()?,
-                exchange: self.consume_domain_name()?,
+            Type::MX => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::MX {
+                    preference: self.consume_u16()?,
+                    exchange: self.consume_domain_name()?,
+                },
             },
-            Type::TXT => Record::TXT {
-                text: self.consume_bytes(rd_length.into())?,
+            Type::TXT => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::TXT {
+                    text: self.consume_bytes(rd_length.into())?,
+                },
             },
-            Type::AAAA => Record::AAAA {
-                address: self.consume_bytes(16)?.try_into().unwrap(),
+            Type::AAAA => ResourceRecord::Record {
+                name,
+                ttl,
+                data: Record::AAAA {
+                    address: self.consume_bytes(16)?.try_into().unwrap(),
+                },
             },
-            Type::OPT => Record::OPT {
+            Type::OPT => ResourceRecord::OPTRecord {
+                size: class,
+                flags: ttl,
                 options: {
                     let mut options = Vec::new();
                     let start = self.pos;
@@ -223,32 +259,32 @@ impl<'a> Parser<'a> {
                             let len = self.consume_u16()?;
                             let data = self.consume_bytes(len.into())?;
 
-                            resource_record::Option { code, len, data }
+                            match code {
+                                _ => resource_record::Option::Unknown { code, len, data },
+                            }
                         });
                     }
 
                     options
                 },
             },
-
-            Type::Unknown(_) => Record::Unknown {
+            Type::Unknown(_) => ResourceRecord::Unknown {
+                name,
+                r#type: r#type.into(),
+                class: class.into(),
+                ttl,
                 data: self.consume_bytes(rd_length.into())?,
             },
             x => {
                 warn!("known record type not implemented {:?}", x);
-                Record::Unknown {
+                ResourceRecord::Unknown {
+                    name,
+                    r#type: r#type.into(),
+                    class: class.into(),
+                    ttl,
                     data: self.consume_bytes(rd_length.into())?,
                 }
             }
-        };
-
-        Ok(resource_record::ResourceRecord {
-            name: r_name,
-            r#type: r_type,
-            class,
-            ttl,
-            rd_length,
-            data: r_data,
         })
     }
 }

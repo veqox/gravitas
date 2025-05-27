@@ -1,9 +1,9 @@
 use crate::{
-    DomainName,
+    Class, DomainName, Type,
     header::Header,
     packet::Packet,
     question::Question,
-    resource_record::{Record, ResourceRecord},
+    resource_record::{Option, Record, ResourceRecord},
 };
 
 pub struct Serializer<'a> {
@@ -80,51 +80,82 @@ impl<'a> Serializer<'a> {
     }
 
     fn write_resource_record(&mut self, resource_record: ResourceRecord<'a>) {
-        self.write_domain_name(resource_record.name);
-        self.write_u16(resource_record.r#type.into());
-        self.write_u16(resource_record.class.into());
-        self.write_u32(resource_record.ttl);
-        self.write_u16(resource_record.rd_length);
+        match resource_record {
+            ResourceRecord::Record { name, ttl, data } => {
+                self.write_domain_name(name);
+                self.write_u16(Type::from(&data).into());
+                self.write_u16(Class::IN.into());
+                self.write_u32(ttl);
+                self.write_u16(data.size() as u16);
 
-        match resource_record.data {
-            Record::A { address } => self.write_bytes(address),
-            Record::NS { nsdname } => self.write_domain_name(nsdname),
-            Record::CNAME { cname } => self.write_domain_name(cname),
-            Record::SOA {
-                mname,
-                rname,
-                serial,
-                refresh,
-                retry,
-                expire,
-                minimum,
-            } => {
-                self.write_domain_name(mname);
-                self.write_domain_name(rname);
-                self.write_u32(serial);
-                self.write_u32(refresh);
-                self.write_u32(retry);
-                self.write_u32(expire);
-                self.write_u32(minimum);
+                match data {
+                    Record::A { address } => self.write_bytes(address),
+                    Record::NS { nsdname } => self.write_domain_name(nsdname),
+                    Record::CNAME { cname } => self.write_domain_name(cname),
+                    Record::SOA {
+                        mname,
+                        rname,
+                        serial,
+                        refresh,
+                        retry,
+                        expire,
+                        minimum,
+                    } => {
+                        self.write_domain_name(mname);
+                        self.write_domain_name(rname);
+                        self.write_u32(serial);
+                        self.write_u32(refresh);
+                        self.write_u32(retry);
+                        self.write_u32(expire);
+                        self.write_u32(minimum);
+                    }
+                    Record::PTR { ptrdname } => self.write_domain_name(ptrdname),
+                    Record::MX {
+                        preference,
+                        exchange,
+                    } => {
+                        self.write_u16(preference);
+                        self.write_domain_name(exchange);
+                    }
+                    Record::TXT { text } => self.write_bytes(text),
+                    Record::AAAA { address } => self.write_bytes(address),
+                };
             }
-            Record::PTR { ptrdname } => self.write_domain_name(ptrdname),
-            Record::MX {
-                preference,
-                exchange,
+            ResourceRecord::OPTRecord {
+                size,
+                flags,
+                options,
             } => {
-                self.write_u16(preference);
-                self.write_domain_name(exchange);
-            }
-            Record::TXT { text } => self.write_bytes(text),
-            Record::AAAA { address } => self.write_bytes(address),
-            Record::OPT { options } => {
+                self.write_domain_name(DomainName::default());
+                self.write_u16(Type::OPT.into());
+                self.write_u16(size);
+                self.write_u32(flags);
+                self.write_u16((options.iter().map(|o| o.size()).sum::<usize>()) as u16);
+
                 for option in options {
-                    self.write_u16(option.code.into());
-                    self.write_u16(option.len);
-                    self.write_bytes(option.data);
+                    match option {
+                        Option::Unknown { code, len, data } => {
+                            self.write_u16(code.into());
+                            self.write_u16(len);
+                            self.write_bytes(data);
+                        }
+                    }
                 }
             }
-            Record::Unknown { data } => self.write_bytes(data),
-        };
+            ResourceRecord::Unknown {
+                name,
+                r#type,
+                class,
+                ttl,
+                data,
+            } => {
+                self.write_domain_name(name);
+                self.write_u16(r#type.into());
+                self.write_u16(class.into());
+                self.write_u32(ttl);
+                self.write_u16(data.len() as u16);
+                self.write_bytes(data);
+            }
+        }
     }
 }
