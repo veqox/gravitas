@@ -1,6 +1,8 @@
 use log::warn;
 
-#[derive(Debug)]
+use crate::{ResourceRecord, rr::Record};
+
+#[derive(Debug, Clone)]
 #[repr(u16)]
 pub enum Type {
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-3.2.2)
@@ -118,6 +120,31 @@ impl From<Type> for u16 {
             Type::HTTPS => 65,
             Type::CAA => 257,
             Type::Unknown(code) => code,
+        }
+    }
+}
+
+impl From<&ResourceRecord<'_>> for Type {
+    fn from(value: &ResourceRecord) -> Self {
+        match value {
+            ResourceRecord::Unknown { r#type, .. } => (*r#type).clone(),
+            ResourceRecord::OPTRecord { .. } => Self::OPT,
+            ResourceRecord::Record { data, .. } => data.into(),
+        }
+    }
+}
+
+impl From<&Record<'_>> for Type {
+    fn from(value: &Record) -> Self {
+        match value {
+            Record::A { .. } => Self::A,
+            Record::NS { .. } => Self::NS,
+            Record::CNAME { .. } => Self::CNAME,
+            Record::SOA { .. } => Self::SOA,
+            Record::PTR { .. } => Self::PTR,
+            Record::MX { .. } => Self::MX,
+            Record::TXT { .. } => Self::TXT,
+            Record::AAAA { .. } => Self::AAAA,
         }
     }
 }
