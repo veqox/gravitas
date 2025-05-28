@@ -6,7 +6,7 @@ use crate::{
     header::Header,
     packet::Packet,
     question::Question,
-    resource_record::{self, Record},
+    rr::{self, Record},
     r#type::Type,
 };
 
@@ -259,8 +259,11 @@ impl<'a> Parser<'a> {
                             let len = self.consume_u16()?;
                             let data = self.consume_bytes(len.into())?;
 
-                            match code {
-                                _ => resource_record::Option::Unknown { code, len, data },
+                            match &code {
+                                x => {
+                                    warn!("known edns option not implemented {:?}", x);
+                                    rr::Option::Unknown { code, len, data }
+                                }
                             }
                         });
                     }

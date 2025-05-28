@@ -1,5 +1,3 @@
-use std::u16;
-
 use crate::{DomainName, class::Class, r#type::Type};
 
 /// DNS resource record field layout as per [RFC 1035 Section 4.1.3](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.3)

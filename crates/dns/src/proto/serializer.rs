@@ -3,7 +3,8 @@ use crate::{
     header::Header,
     packet::Packet,
     question::Question,
-    resource_record::{Option, Record, ResourceRecord},
+    rr,
+    rr::{Record, ResourceRecord},
 };
 
 pub struct Serializer<'a> {
@@ -134,7 +135,7 @@ impl<'a> Serializer<'a> {
 
                 for option in options {
                     match option {
-                        Option::Unknown { code, len, data } => {
+                        rr::Option::Unknown { code, len, data } => {
                             self.write_u16(code.into());
                             self.write_u16(len);
                             self.write_bytes(data);

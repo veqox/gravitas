@@ -1,6 +1,6 @@
 use log::warn;
 
-use crate::{ResourceRecord, resource_record::Record};
+use crate::{ResourceRecord, rr::Record};
 
 #[derive(Debug, Clone)]
 #[repr(u16)]
