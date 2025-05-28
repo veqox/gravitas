@@ -63,7 +63,7 @@ impl From<u16> for Flags {
             z: ((value >> 6) & 0b1) as u8,
             ad: ((value >> 5) & 0b1) as u8,
             cd: ((value >> 4) & 0b1) as u8,
-            rcode: ((value & 0b1111) as u8).into(),
+            rcode: (value & 0b1111).into(),
         }
     }
 }
@@ -72,7 +72,7 @@ impl From<Flags> for u16 {
     fn from(val: Flags) -> Self {
         let mut value = 0u16;
         value |= (val.qr as u16) << 15;
-        value |= (Into::<u8>::into(val.opcode) as u16 & 0b1111) << 11;
+        value |= (u8::from(val.opcode) as u16 & 0b1111) << 11;
         value |= (val.aa as u16) << 10;
         value |= (val.tc as u16) << 9;
         value |= (val.rd as u16) << 8;
@@ -80,7 +80,7 @@ impl From<Flags> for u16 {
         value |= (val.z as u16) << 6;
         value |= (val.ad as u16) << 5;
         value |= (val.cd as u16) << 4;
-        value |= Into::<u8>::into(val.rcode) as u16 & 0b1111;
+        value |= val.rcode.low() as u16;
         value
     }
 }
@@ -136,7 +136,7 @@ impl From<OpCode> for u8 {
 }
 
 #[derive(Debug)]
-#[repr(u8)]
+#[repr(u16)]
 pub enum RCode {
     /// [RFC 1035](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
     NoError,
@@ -203,11 +203,21 @@ pub enum RCode {
     /// [RFC 7873](https://www.rfc-editor.org/rfc/rfc7873)
     BADCOOKIE,
 
-    Unknown(u8),
+    Unknown(u16),
 }
 
-impl From<u8> for RCode {
-    fn from(value: u8) -> Self {
+impl RCode {
+    pub fn low(self) -> u8 {
+        (u16::from(self) & 0x000F) as u8
+    }
+
+    pub fn high(self) -> u8 {
+        (u16::from(self) & 0x0FF0) as u8
+    }
+}
+
+impl From<u16> for RCode {
+    fn from(value: u16) -> Self {
         match value {
             0 => Self::NoError,
             1 => Self::FormatErr,
@@ -234,7 +244,7 @@ impl From<u8> for RCode {
     }
 }
 
-impl From<RCode> for u8 {
+impl From<RCode> for u16 {
     fn from(val: RCode) -> Self {
         match val {
             RCode::NoError => 0,
