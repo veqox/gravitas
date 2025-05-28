@@ -174,120 +174,102 @@ impl<'a> Parser<'a> {
 
     fn consume_resource_record(&mut self) -> Result<ResourceRecord<'a>, ParseError> {
         let name = self.consume_domain_name()?;
-        let r#type = self.consume_u16()?;
+        let r#type = self.consume_u16()?.into();
         let class = self.consume_u16()?;
         let ttl = self.consume_u32()?;
-        let rd_length = self.consume_u16()?;
+        let rd_length = self.consume_u16()?.into();
 
-        Ok(match &r#type.into() {
-            Type::A => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::A {
-                    address: self
-                        .consume_bytes(rd_length.into())?
-                        .try_into()
-                        .map_err(|_| ParseError::FormatError)?,
-                },
-            },
-            Type::NS => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::NS {
-                    nsdname: self.consume_domain_name()?,
-                },
-            },
-            Type::CNAME => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::CNAME {
-                    cname: self.consume_domain_name()?,
-                },
-            },
-            Type::SOA => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::SOA {
-                    mname: self.consume_domain_name()?,
-                    rname: self.consume_domain_name()?,
-                    serial: self.consume_u32()?,
-                    refresh: self.consume_u32()?,
-                    retry: self.consume_u32()?,
-                    expire: self.consume_u32()?,
-                    minimum: self.consume_u32()?,
-                },
-            },
-            Type::PTR => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::PTR {
-                    ptrdname: self.consume_domain_name()?,
-                },
-            },
-            Type::MX => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::MX {
-                    preference: self.consume_u16()?,
-                    exchange: self.consume_domain_name()?,
-                },
-            },
-            Type::TXT => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::TXT {
-                    text: self.consume_bytes(rd_length.into())?,
-                },
-            },
-            Type::AAAA => ResourceRecord::Record {
-                name,
-                ttl,
-                data: Record::AAAA {
-                    address: self.consume_bytes(16)?.try_into().unwrap(),
-                },
-            },
-            Type::OPT => ResourceRecord::OPTRecord {
-                size: class,
-                flags: ttl,
-                options: {
-                    let mut options = Vec::new();
-                    let start = self.pos;
+        match &r#type {
+            Type::OPT => {
+                return Ok(ResourceRecord::OPTRecord {
+                    size: class,
+                    flags: ttl,
+                    options: {
+                        let mut options = Vec::new();
+                        let start = self.pos;
 
-                    while (self.pos - start) < rd_length.into() {
-                        options.push({
-                            let code = self.consume_u16()?.into();
-                            let len = self.consume_u16()?;
-                            let data = self.consume_bytes(len.into())?;
+                        while (self.pos - start) < rd_length {
+                            options.push({
+                                let code = self.consume_u16()?.into();
+                                let len = self.consume_u16()?;
+                                let data = self.consume_bytes(len.into())?;
 
-                            match &code {
-                                x => {
-                                    warn!("known edns option not implemented {:?}", x);
-                                    rr::Option::Unknown { code, len, data }
+                                match &code {
+                                    x => {
+                                        warn!("known edns option not implemented {:?}", x);
+                                        rr::Option::Unknown { code, len, data }
+                                    }
                                 }
-                            }
-                        });
-                    }
+                            });
+                        }
 
-                    options
-                },
-            },
-            Type::Unknown(_) => ResourceRecord::Unknown {
-                name,
-                r#type: r#type.into(),
-                class: class.into(),
-                ttl,
-                data: self.consume_bytes(rd_length.into())?,
-            },
-            x => {
-                warn!("known record type not implemented {:?}", x);
-                ResourceRecord::Unknown {
+                        options
+                    },
+                });
+            }
+            Type::Unknown(_) => {
+                return Ok(ResourceRecord::Unknown {
                     name,
-                    r#type: r#type.into(),
+                    r#type,
                     class: class.into(),
                     ttl,
-                    data: self.consume_bytes(rd_length.into())?,
-                }
+                    data: self.consume_bytes(rd_length)?,
+                });
             }
-        })
+            other => {
+                let data = match other {
+                    Type::A => Record::A {
+                        address: self
+                            .consume_bytes(rd_length)?
+                            .try_into()
+                            .map_err(|_| ParseError::FormatError)?,
+                    },
+                    Type::NS => Record::NS {
+                        nsdname: self.consume_domain_name()?,
+                    },
+                    Type::CNAME => Record::CNAME {
+                        cname: self.consume_domain_name()?,
+                    },
+                    Type::SOA => Record::SOA {
+                        mname: self.consume_domain_name()?,
+                        rname: self.consume_domain_name()?,
+                        serial: self.consume_u32()?,
+                        refresh: self.consume_u32()?,
+                        retry: self.consume_u32()?,
+                        expire: self.consume_u32()?,
+                        minimum: self.consume_u32()?,
+                    },
+                    Type::PTR => Record::PTR {
+                        ptrdname: self.consume_domain_name()?,
+                    },
+                    Type::MX => Record::MX {
+                        preference: self.consume_u16()?,
+                        exchange: self.consume_domain_name()?,
+                    },
+                    Type::TXT => Record::TXT {
+                        text: self.consume_bytes(rd_length)?,
+                    },
+                    Type::AAAA => Record::AAAA {
+                        address: self
+                            .consume_bytes(rd_length)?
+                            .try_into()
+                            .map_err(|_| ParseError::FormatError)?,
+                    },
+                    _ => {
+                        warn!("known record type not implemented {:?}", other);
+
+                        return Ok(ResourceRecord::Unknown {
+                            name,
+                            r#type,
+                            class: class.into(),
+                            ttl,
+                            data: self.consume_bytes(rd_length)?,
+                        });
+                    }
+                };
+
+                Ok(ResourceRecord::Record { name, ttl, data })
+            }
+        }
     }
 }
