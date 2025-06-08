@@ -1,8 +1,11 @@
 use std::net::UdpSocket;
 use std::time::Instant;
 
-use dns::proto::{Parser, Serializer};
-use log::{debug, error, info};
+use dns::{
+    Packet,
+    proto::{Parse, Parser, Serialize, Serializer},
+};
+use log::{debug, error, info, warn};
 
 const LISTEN_ADDR: &str = "0.0.0.0:5300";
 
@@ -28,7 +31,9 @@ fn main() {
 
         let start = Instant::now();
 
-        let packet = match Parser::parse(&buf[..len]) {
+        let mut parser = Parser::new(&buf[..len]);
+
+        let packet = match Packet::parse(&mut parser) {
             Err(err) => {
                 error!("failed to parse packet {:?}", err);
                 continue;
@@ -36,13 +41,23 @@ fn main() {
             Ok(packet) => packet,
         };
 
+        if parser.remaining() > 0 {
+            warn!("{} bytes left in buffer", parser.remaining());
+        }
+
         debug!("packet parsed in {:?}", start.elapsed());
 
         debug!("{:?}", packet);
 
         let mut serialize_buf = [0; 4096];
 
-        let serialize_len = Serializer::serialize(packet, &mut serialize_buf);
+        let serialize_len = match packet.serialize(&mut Serializer::new(&mut serialize_buf)) {
+            Err(err) => {
+                error!("failed to serialize packet {:?}", err);
+                continue;
+            }
+            Ok(len) => len,
+        };
 
         if buf[..len] != serialize_buf[..serialize_len] {
             error!("original:   {:?}", &buf[..len]);

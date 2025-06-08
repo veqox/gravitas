@@ -1,4 +1,12 @@
-use crate::{DomainName, class::Class, r#type::Type};
+use log::warn;
+
+use crate::{
+    DomainName,
+    class::Class,
+    proto::{Parse, ParseError, Serialize, SerializeError, Serializer},
+    rr,
+    r#type::Type,
+};
 
 /// DNS resource record field layout as per [RFC 1035 Section 4.1.3](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.3)
 ///
@@ -42,6 +50,205 @@ pub enum ResourceRecord<'a> {
         ttl: u32,
         data: &'a [u8],
     },
+}
+
+impl<'a> Parse<'a> for ResourceRecord<'a> {
+    fn parse(parser: &mut crate::proto::Parser<'a>) -> Result<Self, ParseError> {
+        let name = DomainName::parse(parser)?;
+        let r#type = parser.consume_u16()?.into();
+        let class = parser.consume_u16()?;
+        let ttl = parser.consume_u32()?;
+        let rd_length = parser.consume_u16()?.into();
+
+        match &r#type {
+            Type::OPT => {
+                return Ok(ResourceRecord::OPTRecord {
+                    size: class,
+                    flags: ttl,
+                    options: {
+                        let mut options = Vec::new();
+                        let start = parser.position();
+
+                        while (parser.position() - start) < rd_length {
+                            options.push({
+                                let code = parser.consume_u16()?.into();
+                                let len = parser.consume_u16()?;
+                                let data = parser.consume_bytes(len.into())?;
+
+                                match &code {
+                                    x => {
+                                        warn!("known edns option not implemented {:?}", x);
+                                        rr::Option::Unknown { code, len, data }
+                                    }
+                                }
+                            });
+                        }
+
+                        options
+                    },
+                });
+            }
+            Type::Unknown(_) => {
+                return Ok(ResourceRecord::Unknown {
+                    name,
+                    r#type,
+                    class: class.into(),
+                    ttl,
+                    data: parser.consume_bytes(rd_length)?,
+                });
+            }
+            other => {
+                let data = match other {
+                    Type::A => Record::A {
+                        address: parser
+                            .consume_bytes(rd_length)?
+                            .try_into()
+                            .map_err(|_| ParseError::FormatError)?,
+                    },
+                    Type::NS => Record::NS {
+                        nsdname: DomainName::parse(parser)?,
+                    },
+                    Type::CNAME => Record::CNAME {
+                        cname: DomainName::parse(parser)?,
+                    },
+                    Type::SOA => Record::SOA {
+                        mname: DomainName::parse(parser)?,
+                        rname: DomainName::parse(parser)?,
+                        serial: parser.consume_u32()?,
+                        refresh: parser.consume_u32()?,
+                        retry: parser.consume_u32()?,
+                        expire: parser.consume_u32()?,
+                        minimum: parser.consume_u32()?,
+                    },
+                    Type::PTR => Record::PTR {
+                        ptrdname: DomainName::parse(parser)?,
+                    },
+                    Type::MX => Record::MX {
+                        preference: parser.consume_u16()?,
+                        exchange: DomainName::parse(parser)?,
+                    },
+                    Type::TXT => Record::TXT {
+                        text: parser.consume_bytes(rd_length)?,
+                    },
+                    Type::AAAA => Record::AAAA {
+                        address: parser
+                            .consume_bytes(rd_length)?
+                            .try_into()
+                            .map_err(|_| ParseError::FormatError)?,
+                    },
+                    _ => {
+                        warn!("known record type not implemented {:?}", other);
+
+                        return Ok(ResourceRecord::Unknown {
+                            name,
+                            r#type,
+                            class: class.into(),
+                            ttl,
+                            data: parser.consume_bytes(rd_length)?,
+                        });
+                    }
+                };
+
+                Ok(ResourceRecord::Record { name, ttl, data })
+            }
+        }
+    }
+}
+
+impl<'a> Serialize<'a> for ResourceRecord<'a> {
+    fn serialize(self, serializer: &mut Serializer<'a>) -> Result<usize, SerializeError> {
+        match self {
+            ResourceRecord::Record { name, ttl, data } => {
+                name.serialize(serializer)?;
+                serializer.write_u16(Type::from(&data).into())?;
+                serializer.write_u16(Class::IN.into())?;
+                serializer.write_u32(ttl)?;
+                serializer.write_u16(data.size() as u16)?;
+
+                match data {
+                    Record::A { address } => {
+                        serializer.write_bytes(address)?;
+                    }
+                    Record::NS { nsdname } => {
+                        nsdname.serialize(serializer)?;
+                    }
+                    Record::CNAME { cname } => {
+                        cname.serialize(serializer)?;
+                    }
+                    Record::SOA {
+                        mname,
+                        rname,
+                        serial,
+                        refresh,
+                        retry,
+                        expire,
+                        minimum,
+                    } => {
+                        mname.serialize(serializer)?;
+                        rname.serialize(serializer)?;
+                        serializer.write_u32(serial)?;
+                        serializer.write_u32(refresh)?;
+                        serializer.write_u32(retry)?;
+                        serializer.write_u32(expire)?;
+                        serializer.write_u32(minimum)?;
+                    }
+                    Record::PTR { ptrdname } => {
+                        ptrdname.serialize(serializer)?;
+                    }
+                    Record::MX {
+                        preference,
+                        exchange,
+                    } => {
+                        serializer.write_u16(preference)?;
+                        exchange.serialize(serializer)?;
+                    }
+                    Record::TXT { text } => {
+                        serializer.write_bytes(text)?;
+                    }
+                    Record::AAAA { address } => {
+                        serializer.write_bytes(address)?;
+                    }
+                };
+            }
+            ResourceRecord::OPTRecord {
+                size,
+                flags,
+                options,
+            } => {
+                DomainName::default().serialize(serializer)?;
+                serializer.write_u16(Type::OPT.into())?;
+                serializer.write_u16(size)?;
+                serializer.write_u32(flags)?;
+                serializer.write_u16((options.iter().map(|o| o.size()).sum::<usize>()) as u16)?;
+
+                for option in options {
+                    match option {
+                        rr::Option::Unknown { code, len, data } => {
+                            serializer.write_u16(code.into())?;
+                            serializer.write_u16(len)?;
+                            serializer.write_bytes(data)?;
+                        }
+                    }
+                }
+            }
+            ResourceRecord::Unknown {
+                name,
+                r#type,
+                class,
+                ttl,
+                data,
+            } => {
+                name.serialize(serializer)?;
+                serializer.write_u16(r#type.into())?;
+                serializer.write_u16(class.into())?;
+                serializer.write_u32(ttl)?;
+                serializer.write_u16(data.len() as u16)?;
+                serializer.write_bytes(data)?;
+            }
+        };
+
+        return Ok(serializer.position());
+    }
 }
 
 #[derive(Debug)]

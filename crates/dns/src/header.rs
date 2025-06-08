@@ -1,5 +1,7 @@
 use log::warn;
 
+use crate::proto::{Parse, ParseError, Parser, Serialize, SerializeError, Serializer};
+
 /// DNS header field layout as per [RFC 1035 Section 4.1.1](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
 ///
 /// ```text
@@ -26,6 +28,32 @@ pub struct Header {
     pub ancount: u16,
     pub nscount: u16,
     pub arcount: u16,
+}
+
+impl<'a> Parse<'_> for Header {
+    fn parse(parser: &mut Parser<'_>) -> Result<Self, ParseError> {
+        Ok(Header {
+            id: parser.consume_u16()?,
+            flags: parser.consume_u16()?.into(),
+            qdcount: parser.consume_u16()?,
+            ancount: parser.consume_u16()?,
+            nscount: parser.consume_u16()?,
+            arcount: parser.consume_u16()?,
+        })
+    }
+}
+
+impl<'a> Serialize<'a> for Header {
+    fn serialize(self, serializer: &mut Serializer<'a>) -> Result<usize, SerializeError> {
+        serializer.write_u16(self.id)?;
+        serializer.write_u16(self.flags.into())?;
+        serializer.write_u16(self.qdcount)?;
+        serializer.write_u16(self.ancount)?;
+        serializer.write_u16(self.nscount)?;
+        serializer.write_u16(self.arcount)?;
+
+        Ok(serializer.position())
+    }
 }
 
 /// DNS flags field layout as per [RFC 1035 Section 4.1.1](https://www.rfc-editor.org/rfc/rfc1035#section-4.1.1)
